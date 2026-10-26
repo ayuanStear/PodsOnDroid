@@ -385,6 +385,22 @@ class L2CAPControllerSettingsTest {
         assertTrue(pending().isEmpty())
     }
 
+    @Test fun renameUpdatesAllLocalNamesImmediatelyWithoutAPendingEcho() {
+        controller.currentPodsInfo = controller.currentPodsInfo!!.copy(name = "Old name")
+        val intent = mock(Intent::class.java)
+        `when`(intent.action).thenReturn(HyperPodsAction.ACTION_PODS_RENAME)
+        `when`(intent.getStringExtra("name")).thenReturn("New name")
+        controller.handleUIEvent(intent)
+        assertEquals("New name", controller.currentPodsInfo!!.name)
+        assertTrue(pending().isEmpty())
+        verify(device).setAlias("New name")
+        val ownership = manager.createDataPacket(
+            manager.createControlCommandPacket(0x06, byteArrayOf(1)))
+        val rename = manager.createDataPacket(manager.createRenamePacket("New name"))
+        val refresh = manager.createDataPacket(manager.createRequestNotificationPacket())
+        assertArrayEquals(ownership + rename + refresh, output.toByteArray())
+    }
+
     @Test fun failedOptionWriteCancelsOffSelectionWithoutSendingMode() {
         receive(0x0d, 4)
         `when`(socket.isConnected).thenReturn(false)

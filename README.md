@@ -31,14 +31,20 @@ This local build targets the Pro 2 control failures reported on 2026-10-26:
 - Local noise/rename commands assert AACP connection ownership first.
 - `ALLOW_OFF_OPTION` and `LISTENING_MODE` are published locally for legacy Pro
   firmware, retried idempotently, and later corrected by any real headset report.
-- Rename updates the Android Bluetooth alias immediately instead of waiting for a
-  `0x1D` echo that Pro 2 firmware frequently omits.
+- Rename updates the in-memory device name, Android Bluetooth alias, detail page and
+  pending state immediately instead of waiting for a `0x1D` echo that Pro 2 firmware
+  frequently omits.
+- The Interconnectivity card hook now matches the clicked card by the connected
+  AirPods MAC rather than an OEM device-type string that changes between builds.
 - Settings to Tools to Spatial audio adds Off, Fixed, and Head tracked modes using
   Android's hidden Spatializer and the packaged arm64 UHID helper.
 
-The debug build uses package `com.hxlh50k.pods.debug`. Enable that module package
-in the LSPosed/KernelSU module manager and keep the same Bluetooth/SystemUI scopes
-as the release package. Head-tracked spatial audio requires root and `/dev/uhid`.
+The test build keeps the OEM-visible package `com.hxlh50k.pods` but uses the debug
+signing certificate. This is required because HyperOS resolves native AirPods
+resources and the Interconnectivity card through that package name. Do not install
+it over an official build signed with a different certificate. Head-tracked spatial
+audio requires root and `/dev/uhid`; grant root explicitly to `com.hxlh50k.pods` in
+KernelSU/Magisk before selecting Head tracked.
 
 ## Compatibility structure
 

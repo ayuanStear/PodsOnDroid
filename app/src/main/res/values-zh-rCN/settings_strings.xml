@@ -21,7 +21,7 @@
 
     <string name="spatial_audio_title">空间音频</string>
     <string name="spatial_audio_summary">通过 Android Spatializer 提供关闭、固定与头部追踪模式</string>
-    <string name="spatial_audio_intro">使用 Android 隐藏 Spatializer 与 root UHID 头追模块。头部追踪需要 root、Arm64 辅助程序、AirPods 正在输出音频，并已同步控制连接。</string>
+    <string name="spatial_audio_intro">使用 Android 隐藏 Spatializer 与 root UHID 头追模块。请先在 KernelSU/Magisk 中给 P.O.D.S. 授予 root；头部追踪还需要 AirPods 正在输出音频，并已同步控制连接。</string>
     <string name="spatial_audio_off">关闭</string>
     <string name="spatial_audio_off_summary">关闭当前输出设备的系统空间音频。</string>
     <string name="spatial_audio_fixed">固定</string>
@@ -34,4 +34,5 @@
     <string name="spatial_audio_status_head_tracked">头部追踪空间音频已启用。</string>
     <string name="spatial_audio_helper_unavailable">root UHID 头追模块不可用，请检查 root 授权与 /dev/uhid。</string>
     <string name="spatial_audio_unsupported">当前系统未提供所需 Spatializer 控制接口。</string>
+    <string name="spatial_audio_waiting_for_spatial_playback">空间音频已启用；请播放支持空间音频的媒体，头部追踪才会进入实际工作状态。</string>
 </resources>

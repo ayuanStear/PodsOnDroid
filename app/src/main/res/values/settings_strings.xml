@@ -21,7 +21,7 @@
 
     <string name="spatial_audio_title">Spatial audio</string>
     <string name="spatial_audio_summary">Off, fixed, and head-tracked output through Android Spatializer</string>
-    <string name="spatial_audio_intro">Uses Android hidden Spatializer and a root UHID head tracker. Head-tracked mode requires root, the Arm64 helper, active AirPods audio, and a synchronized control connection.</string>
+    <string name="spatial_audio_intro">Uses Android hidden Spatializer and a root UHID head tracker. Grant root to P.O.D.S. in KernelSU/Magisk, then keep AirPods audio active and the control connection synchronized for head-tracked mode.</string>
     <string name="spatial_audio_off">Off</string>
     <string name="spatial_audio_off_summary">Disable the system spatializer for the current output.</string>
     <string name="spatial_audio_fixed">Fixed</string>
@@ -34,4 +34,5 @@
     <string name="spatial_audio_status_head_tracked">Head-tracked spatial audio is active.</string>
     <string name="spatial_audio_helper_unavailable">Root UHID head tracker is unavailable. Check root permission and /dev/uhid.</string>
     <string name="spatial_audio_unsupported">This ROM does not expose the required Spatializer controls.</string>
+    <string name="spatial_audio_waiting_for_spatial_playback">Spatializer is enabled; start media that supports spatial audio to activate head tracking.</string>
 </resources>

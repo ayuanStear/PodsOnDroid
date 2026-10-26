@@ -24,6 +24,7 @@ object SpatialAudioRuntime {
     private lateinit var context: Context
     private var initialized = false
     private var requested = SpatialAudioMode.OFF
+    private var lastApplied: SpatialAudioMode? = null
     private var applyJob: Job? = null
     @Volatile private var trackingActive = false
 
@@ -71,6 +72,8 @@ object SpatialAudioRuntime {
             Log.w(TAG, "Runtime used before initialization")
             return
         }
+        if (mode == requested && mode == lastApplied) return
+        Log.i(TAG, "Requested spatial audio mode=" + mode.wireValue)
         requested = mode
         applyJob?.cancel()
         applyJob = scope.launch { apply(mode) }
@@ -88,9 +91,24 @@ object SpatialAudioRuntime {
             .putExtra("mode", mode.wireValue), HyperPodsBroadcasts.BLUETOOTH)
         val controller = RootSpatialAudioController(context.applicationInfo.sourceDir)
         when (mode) {
-            SpatialAudioMode.OFF, SpatialAudioMode.FIXED -> {
+            SpatialAudioMode.OFF -> {
                 bridge.stop()
-                broadcast(controller.setMode(mode))
+                if (lastApplied != null && lastApplied != SpatialAudioMode.OFF) {
+                    broadcast(controller.setMode(mode))
+                } else {
+                    broadcast(SpatialAudioRootState(
+                        helperAvailable = true,
+                        spatializerAvailable = true,
+                        spatializerEnabled = false,
+                    ))
+                }
+                lastApplied = SpatialAudioMode.OFF
+            }
+            SpatialAudioMode.FIXED -> {
+                bridge.stop()
+                val state = controller.setMode(mode)
+                broadcast(state)
+                if (state.supported) lastApplied = SpatialAudioMode.FIXED
             }
             SpatialAudioMode.HEAD_TRACKED -> {
                 bridge.stop()
@@ -99,7 +117,8 @@ object SpatialAudioRuntime {
                     spatializerAvailable = false,
                     error = "Waiting for the Bluetooth headset address",
                 ))
-                HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_GET_PODS_MAC),
+                Log.i(TAG, "Waiting for the Bluetooth headset address")
+        HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_GET_PODS_MAC),
                     HyperPodsBroadcasts.BLUETOOTH)
             }
         }
@@ -107,18 +126,21 @@ object SpatialAudioRuntime {
 
     private suspend fun startHeadTracked(mac: String) {
         if (requested != SpatialAudioMode.HEAD_TRACKED) return
+        Log.i(TAG, "Starting root UHID head tracker for the connected AirPods")
         if (!bridge.start(context, mac)) {
+            Log.e(TAG, "Root UHID head tracker start failed")
             broadcast(SpatialAudioRootState(
                 helperAvailable = false,
                 spatializerAvailable = false,
-                error = "Unable to start the root UHID head tracker",
+                error = "Unable to start the root UHID head tracker. Check root permission for " + context.packageName,
             ))
             return
         }
         val controller = RootSpatialAudioController(context.applicationInfo.sourceDir)
         val state = controller.setMode(SpatialAudioMode.HEAD_TRACKED)
+        Log.i(TAG, "Spatializer enabled=" + state.spatializerEnabled + " desired=" + state.desiredMode + " actual=" + state.actualMode + " error=" + state.error)
         trackingActive = state.supported
-        if (!trackingActive) bridge.stop()
+        if (!trackingActive) bridge.stop() else lastApplied = SpatialAudioMode.HEAD_TRACKED
         broadcast(state)
     }
 

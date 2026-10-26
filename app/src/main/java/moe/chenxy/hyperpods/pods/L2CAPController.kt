@@ -123,8 +123,6 @@ object L2CAPController {
     private val pendingSettings = mutableMapOf<String, PendingSetting>()
     private val failedSettings = mutableMapOf<String, Int>()
     private var pendingOffSelection = false
-    private var pendingRename: String? = null
-    private var renameTimeout: Job? = null
     private var legacyInitializationJob: Job? = null
     private var noiseModeRetryJob: Job? = null
     private var noiseModeRequestedValue: Int? = null
@@ -528,7 +526,7 @@ object L2CAPController {
             }
             HyperPodsAction.ACTION_PODS_RENAME -> {
                 val name = intent.getStringExtra("name")?.trim() ?: return
-                if (name.isEmpty() || '\u0000' in name || name.toByteArray().size > 255 || pendingRename != null) return
+                if (name.isEmpty() || '\u0000' in name || name.toByteArray().size > 255) return
                 val manager = aacpManager ?: return
                 findHeadphoneRoute(routes) // Capture stable identity before the display name changes.
                 if (currentPodsInfo?.modelNumber?.let(AirPodsModels::getModelByModelNumber)
@@ -537,23 +535,15 @@ object L2CAPController {
                     sendSettingResult(PodsSettings.RENAME, false, status = "write_failed")
                     return
                 }
-                pendingRename = name
-                // AirPods Pro 2 does not reliably echo RENAME. LibrePods treats the
-                // accepted transport write as success and updates the Android alias
-                // immediately; a later 0x1D name report remains authoritative.
+                // Pro 2 firmware often applies RENAME without a 0x1D echo. Treat the
+                // accepted write as success, update every local name immediately, and
+                // never keep the detail page pending on an echo that may never arrive.
+                currentPodsInfo?.name = name
                 applyBluetoothAlias(name)
                 sendSettingResult(PodsSettings.RENAME, true, status = "sent")
-                val generation = sessionId
-                renameTimeout = CoroutineScope(Dispatchers.Default).launch {
-                    delay(6000)
-                    synchronized(this@L2CAPController) {
-                        ensureActive()
-                        if (sessionId == generation && pendingRename == name) pendingRename = null
-                    }
-                }
+                sendConnectedStatus()
                 manager.sendNotificationRequest()
             }
-
             HyperPodsAction.ACTION_EAR_DETECTION_SWITCH_CHANGED -> {
                 updateEarDetectionSettings(
                     intent.getBooleanExtra("ear_detection", true),
@@ -602,8 +592,8 @@ object L2CAPController {
 
     private fun sendSettingsState(force: Boolean = false) {
         val values = confirmedSettings()
-        val pending = (pendingSettings.keys + listOfNotNull(pendingRename?.let { PodsSettings.RENAME },
-            PodsSettings.NOISE_MODE.takeIf { pendingOffSelection })).toSet()
+        val pending = (pendingSettings.keys +
+            listOfNotNull(PodsSettings.NOISE_MODE.takeIf { pendingOffSelection })).toSet()
         val unconfirmed = PodsSettings.identifiers.filterValues { aacpManager?.isAwaitingReport(it) == true }.keys.toSet()
         val state = Triple(values, pending, unconfirmed)
         if (!force && lastSettingsState == state) {
@@ -1420,18 +1410,7 @@ object L2CAPController {
             val model = AirPodsModels.getModelByModelNumber(deviceInformation.modelNumber)
             if (Capability.STEM_CONFIG in model?.capabilities.orEmpty()) aacpManager?.restoreNativeStemControls()
             updateHeadGestures()
-            if (pendingRename == deviceInformation.name) {
-                pendingRename = null
-                renameTimeout?.cancel()
-                renameTimeout = null
-                runCatching {
-                    if (mDevice.setAlias(deviceInformation.name) != BluetoothStatusCodes.SUCCESS) Log.w(TAG, "Bluetooth alias update was rejected")
-                }
-                    .onFailure { Log.w(TAG, "Unable to update Bluetooth alias") }
-                sendSettingResult(PodsSettings.RENAME, true)
-                systemIntegrations.updateBattery(mContext, currentBatteryParams, mDevice, lowBatterySettings,
-                    modelNumber = currentPodsInfo?.modelNumber, batteryNotificationSettings = batteryNotificationSettings, controlGeneration = sessionId)
-            } else if (previousModelNumber != deviceInformation.modelNumber &&
+            if (previousModelNumber != deviceInformation.modelNumber &&
                 PodsIslandData.modelForIcons(deviceInformation.modelNumber) != null && ::currentBatteryParams.isInitialized) {
                 // Information can arrive after battery data. Replace the temporary icon now,
                 // without treating cached battery values as a new low-battery reading.
@@ -1762,9 +1741,6 @@ object L2CAPController {
         pendingSettings.clear()
         failedSettings.clear()
         pendingOffSelection = false
-        pendingRename = null
-        renameTimeout?.cancel()
-        renameTimeout = null
         noiseModeRequestedValue = null
         noiseModeRetryJob?.cancel()
         noiseModeRetryJob = null

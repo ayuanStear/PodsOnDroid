@@ -142,8 +142,10 @@ fun SpatialAudioPage(isActive: Boolean) {
             modifier = Modifier.padding(horizontal = 8.dp)) }
         status.supported?.let {
             Text(stringResource(when {
-                it && status.enabled == true && selected == SpatialAudioMode.HEAD_TRACKED ->
+                it && selected == SpatialAudioMode.HEAD_TRACKED && status.actual == 1 ->
                     R.string.spatial_audio_status_head_tracked
+                it && selected == SpatialAudioMode.HEAD_TRACKED && status.enabled == true ->
+                    R.string.spatial_audio_waiting_for_spatial_playback
                 it && status.enabled == true -> R.string.spatial_audio_status_enabled
                 it -> R.string.spatial_audio_status_disabled
                 status.helperAvailable == false -> R.string.spatial_audio_helper_unavailable

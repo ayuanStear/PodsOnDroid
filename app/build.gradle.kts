@@ -22,8 +22,8 @@ android {
         applicationId = "com.hxlh50k.pods"
         minSdk = 35
         targetSdk = 36
-        versionCode = 22
-        versionName = "0.2.3-pro2fix"
+        versionCode = 23
+        versionName = "0.2.4-pro2fix"
         resourceConfigurations += listOf("en", "zh-rCN")
         buildConfigField("String", "BUILD_REVISION", "\"$sourceRevision\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -36,7 +36,6 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".debug"
             buildConfigField("String", "BUILD_INSTANCE", "\"$sourceRevision-${System.currentTimeMillis()}\"")
             signingConfig = signingConfigs.getByName("debug")
             // Keep test APKs installable without HyperOS's debuggable-app warning.

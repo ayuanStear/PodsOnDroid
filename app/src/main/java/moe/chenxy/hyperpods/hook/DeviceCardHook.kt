@@ -48,9 +48,11 @@ object DeviceCardHook {
             val instance = chain.thisObject
             val context = chain.args[0] as Context
             val info = HostReflection.call(instance, "getDeviceInfo")
-            if (HostReflection.call(info, "getDeviceType") != "third_headset" ||
-                Looper.myLooper() != Looper.getMainLooper()) return@intercept chain.proceed()
-            val id = HostReflection.call(info, "getId") as String
+            if (Looper.myLooper() != Looper.getMainLooper()) return@intercept chain.proceed()
+            val type = runCatching { HostReflection.call(info, "getDeviceType") as String }.getOrDefault("unknown")
+            val id = runCatching { HostReflection.call(info, "getId") as String }.getOrNull()
+                ?: return@intercept chain.proceed()
+            Log.d("Art_Chen", "Device card click observed: type=$type")
             if (!registered) {
                 SystemUiContext.resolve(context).registerReceiver(receiver,
                     IntentFilter(HyperPodsAction.ACTION_PODS_MAC_RECEIVED), null, handler,
@@ -63,10 +65,12 @@ object DeviceCardHook {
                 handler.removeCallbacks(timeout)
                 try {
                     if (mac == id) {
+                        Log.i("Art_Chen", "Opening PodsOnDroid headphone panel for the matching card")
                         context.startActivity(Intent("com.hxlh50k.pods.action.show_headphone_panel")
                             .setPackage(BuildConfig.APPLICATION_ID).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                         panelController?.let { HostReflection.call(it, "exitOrHide") }
                     } else {
+                        Log.d("Art_Chen", "Device card is not the current AirPods; preserving the original click")
                         original.invoke(instance, context)
                     }
                 } catch (error: Throwable) {
@@ -75,14 +79,21 @@ object DeviceCardHook {
                         .onFailure { Log.e("Art_Chen", "Unable to restore the original device-card click", it) }
                 }
             }
-            timeout = Runnable { pendingClicks.remove(request)?.invoke(null) }
+            timeout = Runnable {
+                Log.w("Art_Chen", "AirPods identity lookup timed out; preserving the original card click")
+                pendingClicks.remove(request)?.invoke(null)
+            }
             try {
-                if (!handler.postDelayed(timeout, 500)) {
+                if (!handler.postDelayed(timeout, 1_500)) {
                     pendingClicks.remove(request)
                     return@intercept chain.proceed()
                 }
-                HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_GET_PODS_MAC)
-                    .putExtra("request_id", request), HyperPodsBroadcasts.BLUETOOTH)
+                fun requestMac() {
+                    HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_GET_PODS_MAC)
+                        .putExtra("request_id", request), HyperPodsBroadcasts.BLUETOOTH)
+                }
+                requestMac()
+                handler.postDelayed({ if (request in pendingClicks) requestMac() }, 500)
             } catch (error: Throwable) {
                 handler.removeCallbacks(timeout)
                 pendingClicks.remove(request)
