@@ -401,6 +401,25 @@ class L2CAPControllerSettingsTest {
         assertArrayEquals(ownership + rename + refresh, output.toByteArray())
     }
 
+    @Test fun singleEarAncDisabledForcesTransparencyWhenOneEarbudIsWorn() {
+        controller.currentPodsInfo = controller.currentPodsInfo!!.copy(modelNumber = "A3049")
+        receive(0x1b, 2)
+        receive(0x0d, 2)
+        field("currentAnc").setInt(controller, 2)
+        field("earDetectionStateValid").setBoolean(controller, false)
+        output.reset()
+        val method = type.getDeclaredMethod("handleInEarStatusChanged", List::class.java)
+            .apply { isAccessible = true }
+        method.invoke(controller, listOf(EarDetectionStatus.IN_EAR, EarDetectionStatus.IN_CASE))
+        val disableOneBudAnc = manager.createDataPacket(
+            manager.createControlCommandPacket(0x1b, byteArrayOf(2)))
+        val transparency = manager.createDataPacket(
+            manager.createControlCommandPacket(0x0d, byteArrayOf(3)))
+        val refresh = manager.createDataPacket(manager.createRequestNotificationPacket())
+        assertArrayEquals(refresh + disableOneBudAnc + transparency, output.toByteArray())
+        assertEquals(3, field("currentAnc").get(controller))
+    }
+
     @Test fun failedOptionWriteCancelsOffSelectionWithoutSendingMode() {
         receive(0x0d, 4)
         `when`(socket.isConnected).thenReturn(false)
@@ -725,7 +744,15 @@ class L2CAPControllerSettingsTest {
             Triple("A3439", true, 4.toByte()), Triple("A3049", true, 2.toByte()))) {
             singlePodAncSession(model, enabled, mode)
             manager.receivePacket(byteArrayOf(4, 0, 4, 0, 6, 0, 1, 0))
-            assertEquals("$model, enabled=$enabled, mode=$mode", 0, output.size())
+            if (!enabled && mode == 2.toByte()) {
+                val disabled = manager.createDataPacket(
+                    manager.createControlCommandPacket(0x1b, byteArrayOf(2)))
+                val transparency = manager.createDataPacket(
+                    manager.createControlCommandPacket(0x0d, byteArrayOf(3)))
+                assertArrayEquals(disabled + transparency, output.toByteArray())
+            } else {
+                assertEquals("$model, enabled=$enabled, mode=$mode", 0, output.size())
+            }
         }
     }
 

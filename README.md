@@ -36,6 +36,8 @@ This local build targets the Pro 2 control failures reported on 2026-10-26:
   frequently omits.
 - The Interconnectivity card hook now matches the clicked card by the connected
   AirPods MAC rather than an OEM device-type string that changes between builds.
+- When only one earbud is worn and Single AirPod ANC is not explicitly enabled,
+  the module reinforces `0x1B=2` and falls back to transparency.
 - Settings to Tools to Spatial audio adds Off, Fixed, and Head tracked modes using
   Android's hidden Spatializer and the packaged arm64 UHID helper.
 

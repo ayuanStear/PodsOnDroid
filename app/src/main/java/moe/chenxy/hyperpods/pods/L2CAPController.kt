@@ -865,6 +865,8 @@ object L2CAPController {
             sendSettingResult(key, true, status = "sent")
             if (key == PodsSettings.NOISE_MODE && manager != null)
                 scheduleNoiseModeRetry(manager, value, sessionId)
+            if (key == HyperPodsPrefsKey.SINGLE_POD_ANC && value == 2)
+                enforceSingleEarNoisePolicy("option_disabled")
             return
         }
         // Other settings still require a matching headset report.
@@ -932,6 +934,7 @@ object L2CAPController {
             aacpManager?.sendNotificationRequest()
         routeRetryCount = 0
         changeUIInEarStatus(currentEarDetectionParams)
+        if (worn == 1) enforceSingleEarNoisePolicy("wear_change")
 
         if (batteryStateValid && ::currentBatteryParams.isInitialized) {
             val leftInCase = isInCaseStatus(status[0])
@@ -950,6 +953,40 @@ object L2CAPController {
         updateHeadGestures()
         updateAudioForEarState()
         if (restoreAnc) restoreSinglePodAnc()
+    }
+
+    private fun singleEarNoiseCancellationBlocked(): Boolean {
+        if (!earDetectionStateValid || !::currentEarDetectionParams.isInitialized) return false
+        val worn = listOf(currentEarDetectionParams.left, currentEarDetectionParams.right)
+            .count { it == EarDetectionStatus.IN_EAR }
+        if (worn != 1) return false
+        val model = currentPodsInfo?.modelNumber?.let(AirPodsModels::getModelByModelNumber)
+        return PodsSettings.supports(HyperPodsPrefsKey.SINGLE_POD_ANC, model) &&
+            confirmedSettings()[HyperPodsPrefsKey.SINGLE_POD_ANC] != 1
+    }
+
+    /** The Pro 2 option is a headset-side policy, but some firmware keeps ANC active
+     * even after reporting OFF. Reinforce the policy and switch the current mode to
+     * transparency whenever only one earbud is worn. */
+    @Synchronized
+    private fun enforceSingleEarNoisePolicy(reason: String): Boolean {
+        if (!singleEarNoiseCancellationBlocked()) return false
+        val manager = aacpManager ?: return false
+        manager.sendControlCommand(
+            AACPManager.Companion.ControlCommandIdentifiers.ONE_BUD_ANC_MODE.value, 2
+        )
+        if (currentAnc != 2) return true
+        if (!manager.sendControlCommand(
+                AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE.value,
+                byteArrayOf(3), updateLocally = true
+            )) return false
+        currentAnc = 3
+        AirPodsNotifications.ANC.setStatus(byteArrayOf(3))
+        changeUIAncStatus(3)
+        lastSettingKey = PodsSettings.NOISE_MODE
+        lastSettingStatus = "sent"
+        Log.i(TAG, "Single-ear noise cancellation blocked ($reason)")
+        return true
     }
 
     private fun singlePodAncEnabled(): Boolean =
@@ -1853,6 +1890,11 @@ object L2CAPController {
     @Synchronized
     fun setANCMode(mode: Int) {
         Log.d(TAG, "setANCMode: $mode")
+        if (mode == 2 && singleEarNoiseCancellationBlocked()) {
+            Log.i(TAG, "Single-ear ANC is disabled; falling back to transparency")
+            enforceSingleEarNoisePolicy("user_selected_anc")
+            return
+        }
         if (pendingOffSelection) return
         // A user choice must replace the automatic request, not be rejected by
         // its pending confirmation. Do not cancel an unrelated user request.

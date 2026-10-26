@@ -35,4 +35,6 @@
     <string name="spatial_audio_helper_unavailable">root UHID 头追模块不可用，请检查 root 授权与 /dev/uhid。</string>
     <string name="spatial_audio_unsupported">当前系统未提供所需 Spatializer 控制接口。</string>
     <string name="spatial_audio_waiting_for_spatial_playback">空间音频已启用；请播放支持空间音频的媒体，头部追踪才会进入实际工作状态。</string>
+    <string name="spatial_audio_open_root_manager">打开 root 管理器，为 P.O.D.S. 授予权限</string>
+    <string name="spatial_audio_root_denied">需要 root 权限。请打开 KernelSU/Magisk 为 P.O.D.S. 授予 root，然后重试。</string>
 </resources>

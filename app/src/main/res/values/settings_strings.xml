@@ -35,4 +35,6 @@
     <string name="spatial_audio_helper_unavailable">Root UHID head tracker is unavailable. Check root permission and /dev/uhid.</string>
     <string name="spatial_audio_unsupported">This ROM does not expose the required Spatializer controls.</string>
     <string name="spatial_audio_waiting_for_spatial_playback">Spatializer is enabled; start media that supports spatial audio to activate head tracking.</string>
+    <string name="spatial_audio_open_root_manager">Open root manager to grant P.O.D.S. access</string>
+    <string name="spatial_audio_root_denied">Root permission is required. Open KernelSU/Magisk and grant root to P.O.D.S., then retry.</string>
 </resources>

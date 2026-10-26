@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -138,8 +139,20 @@ fun SpatialAudioPage(isActive: Boolean) {
         }
         if (pending != null) Text(stringResource(R.string.spatial_audio_applying), fontSize = 13.sp,
             color = MiuixTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp))
-        status.error?.let { Text(it, fontSize = 13.sp, color = MiuixTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 8.dp)) }
+        status.error?.let { error ->
+            val rootPermissionError = error.contains("Permission denied", ignoreCase = true) ||
+                error.contains("Cannot run program \"su\"", ignoreCase = true) ||
+                error.contains("root permission", ignoreCase = true)
+            Text(if (rootPermissionError) stringResource(R.string.spatial_audio_root_denied) else error,
+                fontSize = 13.sp, color = MiuixTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 8.dp))
+            if (rootPermissionError || error.contains("root", ignoreCase = true)) {
+                Text(stringResource(R.string.spatial_audio_open_root_manager), fontSize = 14.sp,
+                    color = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                        .clickable { openRootManager(context) })
+            }
+        }
         status.supported?.let {
             Text(stringResource(when {
                 it && selected == SpatialAudioMode.HEAD_TRACKED && status.actual == 1 ->
@@ -153,5 +166,14 @@ fun SpatialAudioPage(isActive: Boolean) {
             }), fontSize = 13.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(horizontal = 8.dp))
         }
+    }
+}
+
+private fun openRootManager(context: Context) {
+    for (pkg in listOf("me.weishu.kernelsu", "com.topjohnwu.magisk")) {
+        val intent = context.packageManager.getLaunchIntentForPackage(pkg) ?: continue
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+        return
     }
 }
