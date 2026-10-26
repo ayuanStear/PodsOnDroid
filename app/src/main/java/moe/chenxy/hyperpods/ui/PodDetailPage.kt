@@ -1,5 +1,6 @@
 package moe.chenxy.hyperpods.ui
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 
@@ -37,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.paneTitle
@@ -45,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import moe.chenxy.hyperpods.R
+import moe.chenxy.hyperpods.SpatialAudioActivity
 import moe.chenxy.hyperpods.pods.NoiseControlMode
 import moe.chenxy.hyperpods.ui.components.DashboardBattery
 import moe.chenxy.hyperpods.ui.components.ChimeVolumeSlider
@@ -117,6 +120,7 @@ fun PodDetailPage(
     allowUnfinishedFeatures: Boolean = false,
 ) {
     val model = podsInfo?.let { getModelByModelNumber(it.modelNumber) }
+    val context = LocalContext.current
     fun ready(key: String) = PodsSettings.editable(key, model, settings, pendingSettings,
         diagnostics?.getString("connection") == "connected", allowUnfinishedFeatures)
     @Composable
@@ -225,6 +229,11 @@ fun PodDetailPage(
                             Card {
                                 DashboardToggle(stringResource(R.string.dashboard_detection_title),
                                     stringResource(R.string.dashboard_detection_summary), earDetectionEnable, onEarDetectionChanged)
+                                DashboardDivider(Modifier.padding(horizontal = 16.dp))
+                                DashboardLink(stringResource(R.string.spatial_audio_title),
+                                    stringResource(R.string.spatial_audio_summary)) {
+                                    context.startActivity(Intent(context, SpatialAudioActivity::class.java))
+                                }
                                 DashboardDivider(Modifier.padding(horizontal = 16.dp))
                                 DashboardLink(stringResource(R.string.dashboard_more),
                                     stringResource(if (model?.capabilities?.contains(Capability.HEAD_GESTURES) == true &&

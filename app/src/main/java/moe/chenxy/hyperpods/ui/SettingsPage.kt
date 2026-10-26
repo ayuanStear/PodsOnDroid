@@ -86,7 +86,6 @@ fun SettingsPage(padding: PaddingValues, diagnostics: Bundle? = null, isActive: 
                             }
                             SettingsDestination.MODULES -> ModuleSettings(profile) { moduleReport = it }
                             SettingsDestination.HEAD_TRACKING -> DashboardGroup { HeadTrackingPage(current) }
-                            SettingsDestination.SPATIAL_AUDIO -> SpatialAudioPage(current)
                             SettingsDestination.LID_OBSERVATION -> if (BuildConfig.BUILD_TYPE == "debug")
                                 DashboardGroup { LidObservationPanel(current) }
                             else -> Unit
@@ -108,7 +107,6 @@ private val SettingsDestination.title: Int
         SettingsDestination.CONNECTION -> R.string.diagnostics_title
         SettingsDestination.MODULES -> R.string.settings_modules
         SettingsDestination.HEAD_TRACKING -> R.string.head_test_title
-        SettingsDestination.SPATIAL_AUDIO -> R.string.spatial_audio_title
         SettingsDestination.LID_OBSERVATION -> R.string.settings_lid_observation
     }
 
@@ -122,14 +120,12 @@ private fun SettingsEntry(destination: SettingsDestination, enabled: Boolean, op
         SettingsDestination.CONNECTION -> R.string.settings_connection_summary
         SettingsDestination.MODULES -> R.string.settings_modules_summary
         SettingsDestination.HEAD_TRACKING -> R.string.head_test_summary
-        SettingsDestination.SPATIAL_AUDIO -> R.string.spatial_audio_summary
         SettingsDestination.LID_OBSERVATION -> R.string.settings_lid_summary
         SettingsDestination.ROOT -> error("The settings root is not a child entry")
     }
     val icon = when (destination) {
         SettingsDestination.NOTIFICATIONS -> R.drawable.dashboard_battery
-        SettingsDestination.HEAD_TRACKING, SettingsDestination.SPATIAL_AUDIO,
-        SettingsDestination.LID_OBSERVATION -> R.drawable.dashboard_headphones
+        SettingsDestination.HEAD_TRACKING, SettingsDestination.LID_OBSERVATION -> R.drawable.dashboard_headphones
         else -> R.drawable.dashboard_settings
     }
         Row(Modifier.fillMaxWidth().clickable(enabled = enabled, role = Role.Button, onClick = open)
