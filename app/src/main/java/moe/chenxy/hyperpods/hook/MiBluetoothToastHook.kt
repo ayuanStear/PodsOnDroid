@@ -16,6 +16,9 @@ object MiBluetoothToastHook {
     private var batteryHost: BatteryNotificationHost? = null
 
     fun install(framework: XposedInterface, classLoader: ClassLoader) {
+        installHook("Native AirPods battery bridge") {
+            NativeAirPodsBatteryBridge.install(framework, classLoader)
+        }
         fun register(context: Context) {
             if (receiverRegistered || !AudioConnectionNotifications.ownsPresentation(Application.getProcessName())) return
             try {
