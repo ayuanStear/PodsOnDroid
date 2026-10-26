@@ -131,31 +131,7 @@ fun SpatialAudioPage(isActive: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(stringResource(R.string.spatial_audio_intro), fontSize = 14.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary, modifier = Modifier.padding(horizontal = 8.dp))
-        Card {
-            Column {
-                SpatialAudioMode.entries.forEachIndexed { index, mode ->
-                    if (index > 0) DashboardDivider(Modifier.padding(start = 64.dp, end = 16.dp))
-                    val canSelect = mode == SpatialAudioMode.OFF || binauralReady
-                    Row(Modifier.fillMaxWidth().clickable(enabled = canSelect) { apply(mode) }
-                        .alpha(if (canSelect) 1f else .45f)
-                        .padding(horizontal = 18.dp, vertical = 15.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        Box(Modifier.size(30.dp).clip(RoundedCornerShape(10.dp))
-                            .background(if (selected == mode) MiuixTheme.colorScheme.primary
-                            else MiuixTheme.colorScheme.surfaceVariant),
-                            contentAlignment = Alignment.Center) {
-                            Text(if (selected == mode) "✓" else "", color = MiuixTheme.colorScheme.onPrimary, fontSize = 17.sp)
-                        }
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(stringResource(mode.label()), fontSize = 17.sp)
-                            Text(stringResource(mode.summary()), fontSize = 13.sp,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-                        }
-                    }
-                }
-            }
-        }
+        SpatialAudioSwitch(selected, ::apply, available = binauralReady)
         if (!binauralReady) Text(stringResource(R.string.spatial_audio_binaural_required), fontSize = 13.sp,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.padding(horizontal = 8.dp))

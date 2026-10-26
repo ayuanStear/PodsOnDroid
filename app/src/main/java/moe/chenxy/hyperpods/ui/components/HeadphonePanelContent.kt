@@ -63,7 +63,7 @@ internal fun HeadphonePanelContent(
     maxHeightDp: Float,
     connected: Boolean,
     onMode: (Int) -> Unit,
-    onSpatial: () -> Unit,
+    onSpatial: (SpatialAudioMode) -> Unit,
     onMore: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -183,21 +183,31 @@ private fun PanelNoise(state: PanelModeState, supported: Set<Int>, enabled: Bool
 }
 
 @Composable
-private fun PanelSpatialAudio(mode: SpatialAudioMode, available: Boolean, connected: Boolean, onOpen: () -> Unit) {
-    val modeLabel = stringResource(when (mode) {
-        SpatialAudioMode.OFF -> R.string.spatial_audio_off
-        SpatialAudioMode.FIXED -> R.string.spatial_audio_fixed
-        SpatialAudioMode.HEAD_TRACKED -> R.string.spatial_audio_head_tracked
-    })
-    val summary = if (!available) stringResource(R.string.spatial_audio_binaural_required) else modeLabel
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(PanelControl)
-        .clickable(enabled = connected, role = Role.Button, onClick = onOpen)
-        .alpha(if (connected) 1f else .45f).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(stringResource(R.string.spatial_audio_title), color = Color.White, fontSize = 17.sp)
-            Text(summary, color = PanelSecondary, fontSize = 12.sp)
+private fun PanelSpatialAudio(mode: SpatialAudioMode, available: Boolean, connected: Boolean, select: (SpatialAudioMode) -> Unit) {
+    val labels = listOf(R.string.spatial_audio_off, R.string.spatial_audio_fixed,
+        R.string.spatial_audio_head_tracked)
+    val icons = listOf(R.drawable.spatial_audio_off, R.drawable.spatial_audio_fixed,
+        R.drawable.spatial_audio_head_tracked)
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(PanelControl).padding(12.dp)) {
+        Text(stringResource(R.string.spatial_audio_title), color = PanelSecondary, fontSize = 14.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+        Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            SpatialAudioMode.entries.forEachIndexed { index, value ->
+                val selected = value == mode
+                val enabled = connected && (value == SpatialAudioMode.OFF || available)
+                val foreground = if (selected) Color(0xFF414147) else Color.White
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(18.dp))
+                    .background(if (selected) Color.White.copy(alpha = .92f) else Color.Transparent)
+                    .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = { select(value) })
+                    .alpha(if (enabled) 1f else .45f).padding(vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(painterResource(icons[index]), null, Modifier.size(22.dp),
+                        colorFilter = ColorFilter.tint(foreground))
+                    Text(stringResource(labels[index]), color = foreground, fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 6.dp))
+                }
+            }
         }
-        Text(modeLabel, color = PanelSecondary, fontSize = 14.sp)
     }
 }
 

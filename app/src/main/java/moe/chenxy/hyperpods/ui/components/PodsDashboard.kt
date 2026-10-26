@@ -53,6 +53,7 @@ import moe.chenxy.hyperpods.ui.LocalNavigationEffects
 import moe.chenxy.hyperpods.utils.FloatingDockLayout
 import moe.chenxy.hyperpods.pods.EarDetectionStatus
 import moe.chenxy.hyperpods.pods.NoiseControlMode
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
 import moe.chenxy.hyperpods.utils.AirPodsBase
 import moe.chenxy.hyperpods.utils.StatusFreshness
 import moe.chenxy.hyperpods.utils.data.BatteryParams
@@ -299,6 +300,41 @@ fun DashboardNoise(mode: NoiseControlMode?, onSelect: (NoiseControlMode) -> Unit
             val background by animateColorAsState(
                 if (selected) MiuixTheme.colorScheme.primaryVariant else Color.Transparent,
                 animationSpec = tween(160), label = "NoiseModeBackground")
+            Column(Modifier.weight(1f).alpha(if (enabled) 1f else 0.4f).clip(RoundedCornerShape(20.dp))
+                .background(background)
+                .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = { onSelect(value) })
+                .padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(painterResource(icons[index]), null, modifier = Modifier.size(24.dp),
+                    colorFilter = ColorFilter.tint(foreground))
+                Text(stringResource(labels[index]), color = foreground, fontSize = 12.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier.padding(top = 5.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun SpatialAudioSwitch(
+    mode: SpatialAudioMode,
+    onSelect: (SpatialAudioMode) -> Unit,
+    available: Boolean = true,
+) {
+    val labels = listOf(R.string.spatial_audio_off, R.string.spatial_audio_fixed,
+        R.string.spatial_audio_head_tracked)
+    val icons = listOf(R.drawable.spatial_audio_off, R.drawable.spatial_audio_fixed,
+        R.drawable.spatial_audio_head_tracked)
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(MiuixTheme.colorScheme.surface)
+        .padding(6.dp).selectableGroup()) {
+        SpatialAudioMode.entries.forEachIndexed { index, value ->
+            val selected = value == mode
+            val enabled = value == SpatialAudioMode.OFF || available
+            val foreground by animateColorAsState(
+                if (selected) MiuixTheme.colorScheme.onPrimaryVariant else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                animationSpec = tween(160), label = "SpatialAudioForeground")
+            val background by animateColorAsState(
+                if (selected) MiuixTheme.colorScheme.primaryVariant else Color.Transparent,
+                animationSpec = tween(160), label = "SpatialAudioBackground")
             Column(Modifier.weight(1f).alpha(if (enabled) 1f else 0.4f).clip(RoundedCornerShape(20.dp))
                 .background(background)
                 .selectable(selected, enabled = enabled, role = Role.RadioButton, onClick = { onSelect(value) })

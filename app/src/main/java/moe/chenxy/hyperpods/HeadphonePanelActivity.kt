@@ -20,6 +20,7 @@ import moe.chenxy.hyperpods.ui.components.*
 import moe.chenxy.hyperpods.utils.*
 import moe.chenxy.hyperpods.utils.data.*
 import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioRuntime
 import moe.chenxy.hyperpods.utils.spatial.isBinauralWear
 import java.util.function.Consumer
 
@@ -163,9 +164,15 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
             HyperPodsBroadcasts.send(activity, Intent(HyperPodsAction.ACTION_ANC_SELECT)
                 .putExtra("status", mode), HyperPodsBroadcasts.BLUETOOTH)
         },
-        onSpatial = {
-            activity.startActivity(Intent(activity, SpatialAudioActivity::class.java))
-            activity.finish()
+        onSpatial = { mode ->
+            if (mode == SpatialAudioMode.OFF || binauralReady) {
+                spatialMode = mode
+                val snapshot = AppPreferences.read(activity).copy(spatialAudioMode = mode)
+                if (AppPreferences.save(activity, snapshot)) {
+                    AppPreferences.publish(activity, snapshot)
+                    SpatialAudioRuntime.setMode(mode)
+                }
+            }
         },
         onMore = {
             activity.startActivity(Intent(activity, MainActivity::class.java)

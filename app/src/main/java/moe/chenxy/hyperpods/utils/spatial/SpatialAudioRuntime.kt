@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import moe.chenxy.hyperpods.utils.AppPreferences
 import moe.chenxy.hyperpods.utils.HyperPodsBroadcasts
 import moe.chenxy.hyperpods.utils.data.EarDetectionParams
 import moe.chenxy.hyperpods.utils.data.HyperPodsAction
@@ -26,7 +27,8 @@ object SpatialAudioRuntime {
     private var initialized = false
     @Volatile private var requested = SpatialAudioMode.OFF
     @Volatile private var lastApplied: SpatialAudioMode? = null
-    @Volatile private var binauralReady = false
+    private enum class WearState { UNKNOWN, SINGLE, BINAURAL }
+    @Volatile private var wearState = WearState.UNKNOWN
     private var applyJob: Job? = null
     @Volatile private var trackingActive = false
 
@@ -37,7 +39,7 @@ object SpatialAudioRuntime {
                 HyperPodsAction.ACTION_SPATIAL_AUDIO_POSE -> submitPose(intent)
                 HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED -> {
                     val status = intent.getParcelableExtra("status", EarDetectionParams::class.java)
-                    updateBinauralReady(isBinauralWear(status))
+                    updateWearState(if (isBinauralWear(status)) WearState.BINAURAL else WearState.SINGLE)
                 }
                 HyperPodsAction.ACTION_SPATIAL_AUDIO_TRACKING_STATE -> {
                     if (!intent.getBooleanExtra("tracking_active", false)) {
@@ -49,11 +51,14 @@ object SpatialAudioRuntime {
                     trackingActive = false
                     bridge.stop()
                     processor.reset()
-                    updateBinauralReady(false)
+                    if (requested != SpatialAudioMode.OFF && lastApplied != SpatialAudioMode.OFF) {
+                        schedule { applyBinauralRestriction() }
+                    }
+                    updateWearState(WearState.UNKNOWN)
                 }
                 HyperPodsAction.ACTION_PODS_MAC_RECEIVED -> {
                     val mac = intent.getStringExtra("mac").orEmpty()
-                    if (requested == SpatialAudioMode.HEAD_TRACKED && binauralReady && MAC.matches(mac)) {
+                    if (requested == SpatialAudioMode.HEAD_TRACKED && wearState == WearState.BINAURAL && MAC.matches(mac)) {
                         schedule { startHeadTracked(mac) }
                     }
                 }
@@ -73,6 +78,12 @@ object SpatialAudioRuntime {
             addAction(HyperPodsAction.ACTION_PODS_MAC_RECEIVED)
         }, Context.RECEIVER_EXPORTED)
         initialized = true
+        val saved = AppPreferences.read(context).spatialAudioMode
+        if (saved != SpatialAudioMode.OFF) {
+            requested = saved
+            applyJob = scope.launch { apply(saved) }
+            Log.i(TAG, "Restoring persisted spatial audio mode=" + saved.wireValue)
+        }
     }
 
     @Synchronized
@@ -88,14 +99,18 @@ object SpatialAudioRuntime {
         applyJob = scope.launch { apply(mode) }
     }
 
-    private fun updateBinauralReady(ready: Boolean) {
-        if (binauralReady == ready) return
-        binauralReady = ready
+    private fun updateWearState(state: WearState) {
+        if (wearState == state) return
+        wearState = state
         val mode = requested
-        if (!ready) {
-            if (lastApplied != SpatialAudioMode.OFF) schedule { applyBinauralRestriction() }
-        } else if (mode != SpatialAudioMode.OFF && lastApplied != mode) {
-            schedule { apply(mode) }
+        when (state) {
+            WearState.SINGLE -> if (mode != SpatialAudioMode.OFF && lastApplied != SpatialAudioMode.OFF) {
+                schedule { applyBinauralRestriction() }
+            }
+            WearState.BINAURAL -> if (mode != SpatialAudioMode.OFF && lastApplied != mode) {
+                schedule { apply(mode) }
+            }
+            WearState.UNKNOWN -> Unit
         }
     }
 
@@ -105,9 +120,15 @@ object SpatialAudioRuntime {
     }
 
     private suspend fun apply(mode: SpatialAudioMode) {
-        if (mode != SpatialAudioMode.OFF && !binauralReady) {
-            applyBinauralRestriction()
-            return
+        if (mode != SpatialAudioMode.OFF) {
+            when (wearState) {
+                WearState.SINGLE -> {
+                    applyBinauralRestriction()
+                    return
+                }
+                WearState.UNKNOWN -> return
+                WearState.BINAURAL -> Unit
+            }
         }
         trackingActive = false
         processor.reset()
@@ -162,7 +183,7 @@ object SpatialAudioRuntime {
     }
 
     private suspend fun startHeadTracked(mac: String) {
-        if (requested != SpatialAudioMode.HEAD_TRACKED || !binauralReady) return
+        if (requested != SpatialAudioMode.HEAD_TRACKED || wearState != WearState.BINAURAL) return
         Log.i(TAG, "Starting root UHID head tracker for the connected AirPods")
         if (!bridge.start(context, mac)) {
             Log.e(TAG, "Root UHID head tracker start failed")
