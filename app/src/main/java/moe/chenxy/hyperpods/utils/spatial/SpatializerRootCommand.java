@@ -56,15 +56,15 @@ public final class SpatializerRootCommand {
                     // Some vendor implementations retain the last actual mode
                     // while the A2DP route remains active, even after the head
                     // tracker is removed. Desired=-1 is the authoritative stop.
-                    Thread.sleep(300);
+                    Thread.sleep(120);
                 } else {
-                    for (int attempt = 0; attempt < 20; attempt++) {
+                    for (int attempt = 0; attempt < 3; attempt++) {
                         int actual = (Integer) invoke(
                                 audioService, "getActualHeadTrackingMode", new Class<?>[0]);
                         if (actual == headTrackingMode) {
                             break;
                         }
-                        Thread.sleep(100);
+                        Thread.sleep(60);
                     }
                 }
             }

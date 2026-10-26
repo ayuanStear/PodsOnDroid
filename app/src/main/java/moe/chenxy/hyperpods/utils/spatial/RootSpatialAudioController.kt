@@ -27,7 +27,11 @@ class RootSpatialAudioController(private val apkPath: String) {
     }
 
     fun setMode(mode: SpatialAudioMode): SpatialAudioRootState {
-        val helperAvailable = runRoot(HELPER_PROBE).exitCode == 0
+        val helperAvailable = if (mode == SpatialAudioMode.HEAD_TRACKED) {
+            runRoot(HELPER_PROBE).exitCode == 0
+        } else {
+            true
+        }
         if (mode == SpatialAudioMode.HEAD_TRACKED && !helperAvailable) {
             return SpatialAudioRootState(
                 helperAvailable = false,
