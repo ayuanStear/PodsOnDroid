@@ -8,6 +8,7 @@ import android.os.Binder
 import android.os.Bundle
 import android.util.AtomicFile
 import moe.chenxy.hyperpods.utils.data.HyperPodsPrefsKey as Key
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -28,8 +29,10 @@ class AppPreferencesTest {
 
     @Test fun allPolicyChoicesRoundTripWithoutResettingOtherSwitches() {
         assertEquals(snapshot, AppPreferences.decode(snapshot.encode()))
-        assertEquals(14, JSONObject(snapshot.encode()).length())
+        assertEquals(15, JSONObject(snapshot.encode()).length())
         assertEquals(snapshot.copy(headGestures = true), AppPreferences.decode(snapshot.copy(headGestures = true).encode()))
+        assertEquals(snapshot.copy(spatialAudioMode = SpatialAudioMode.HEAD_TRACKED),
+            AppPreferences.decode(snapshot.copy(spatialAudioMode = SpatialAudioMode.HEAD_TRACKED).encode()))
     }
 
     @Test fun unfinishedOverrideDefaultsOffMigratesOffAndRequiresAnExplicitBoolean() {

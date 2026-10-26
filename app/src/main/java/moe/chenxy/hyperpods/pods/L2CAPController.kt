@@ -49,6 +49,11 @@ import moe.chenxy.hyperpods.utils.HyperPodsBroadcasts
 import moe.chenxy.hyperpods.utils.SystemApisUtils
 import moe.chenxy.hyperpods.utils.SinglePodAnc
 import moe.chenxy.hyperpods.utils.SystemIntegrations
+import moe.chenxy.hyperpods.utils.spatial.RootHeadTrackerBridge
+import moe.chenxy.hyperpods.utils.spatial.RootSpatialAudioController
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioRootState
+import moe.chenxy.hyperpods.utils.spatial.SpatialHeadPoseProcessor
 import moe.chenxy.hyperpods.utils.data.BatteryParams
 import moe.chenxy.hyperpods.utils.data.EarDetectionParams
 import moe.chenxy.hyperpods.utils.data.HyperPodsAction
@@ -84,6 +89,7 @@ object L2CAPController {
     private var lastSwipeRequest: Int? = null
     private var ownershipRequestStatus = "idle"
     private var ownershipRequestJob: Job? = null
+    private var ownershipAsserted = false
     private var lastDiagnostics: Bundle? = null
     private var lastTimelineState = ""
     private var lastTimelineStage = ""
@@ -123,6 +129,9 @@ object L2CAPController {
     private var pendingOffSelection = false
     private var pendingRename: String? = null
     private var renameTimeout: Job? = null
+    private var legacyInitializationJob: Job? = null
+    private var noiseModeRetryJob: Job? = null
+    private var noiseModeRequestedValue: Int? = null
     private var conversationTimeout: Job? = null
     private var conversationRestoreJob: Job? = null
     private var headphoneRouteId: String? = null
@@ -141,6 +150,11 @@ object L2CAPController {
     private var batteryNotificationSettings = BatteryNotificationSettings()
     private var headGestures = false
     private var allowUnfinishedFeatures = false
+    private var requestedSpatialAudioMode = SpatialAudioMode.OFF
+    private var spatialApplyJob: Job? = null
+    private var spatialTrackingActive = false
+    private val spatialPoseProcessor = SpatialHeadPoseProcessor()
+    private val rootHeadTracker = RootHeadTrackerBridge()
     private var headGestureCalls: HeadGestureCalls? = null
     private val headTrackingStream = HeadTrackingStream(
         sendStandard = { start -> sendHeadTrackingCommand(start, HeadTrackingStream.Variant.STANDARD) },
@@ -228,6 +242,9 @@ object L2CAPController {
 
     private fun clearHeadTracking() {
         headPreview.stop("disconnected")
+        spatialTrackingActive = false
+        rootHeadTracker.stop()
+        spatialPoseProcessor.reset()
         headGestureCalls?.close()
         headGestureCalls = null
         headTrackingStream.reset()
@@ -237,6 +254,110 @@ object L2CAPController {
         headPreviewWatchdog?.cancel()
         headPreviewWatchdog = null
     }
+
+    @Synchronized
+    private fun stopSpatialTracking(reason: String) {
+        if (!spatialTrackingActive && !headTrackingStream.isOwnedBy(HeadTrackingStream.Owner.SPATIAL)) {
+            rootHeadTracker.stop()
+            spatialPoseProcessor.reset()
+            return
+        }
+        spatialTrackingActive = false
+        headTrackingStream.release(HeadTrackingStream.Owner.SPATIAL)
+        rootHeadTracker.stop()
+        spatialPoseProcessor.reset()
+        Log.i(TAG, "Spatial head tracking stopped: $reason")
+    }
+
+    private fun scheduleSpatialAudioApply(delayMs: Long = 0) {
+        spatialApplyJob?.cancel()
+        spatialApplyJob = CoroutineScope(Dispatchers.Default).launch {
+            if (delayMs > 0) delay(delayMs)
+            applySpatialAudioMode()
+        }
+    }
+
+    private suspend fun applySpatialAudioMode() {
+        val mode: SpatialAudioMode
+        val context: Context
+        val manager: AACPManager?
+        val address: String?
+        synchronized(this@L2CAPController) {
+            mode = requestedSpatialAudioMode
+            context = mContext ?: run {
+                broadcastSpatialAudioFailure(mode, "Connect the AirPods first")
+                return
+            }
+            manager = aacpManager
+            address = if (::mDevice.isInitialized) mDevice.address else null
+        }
+        val apkPath = try {
+            context.packageManager.getApplicationInfo(BuildConfig.APPLICATION_ID, 0).sourceDir
+        } catch (error: Exception) {
+            broadcastSpatialAudioFailure(mode, "PodsOnDroid APK is unavailable: ${error.message}")
+            return
+        }
+        val rootSpatial = RootSpatialAudioController(apkPath)
+        if (mode == SpatialAudioMode.HEAD_TRACKED) {
+            if (!headTrackingReady() || manager == null || address.isNullOrBlank()) {
+                broadcastSpatialAudioFailure(mode, "Wait for headset status synchronization, then retry")
+                return
+            }
+            if (!rootHeadTracker.start(context, address)) {
+                broadcastSpatialAudioFailure(mode, "Unable to start the root UHID head tracker")
+                return
+            }
+            val acquired = synchronized(this@L2CAPController) {
+                headTrackingStream.acquire(HeadTrackingStream.Owner.SPATIAL) {
+                    stopSpatialTracking("interrupted")
+                }.also { if (it) spatialTrackingActive = true }
+            }
+            if (!acquired) {
+                rootHeadTracker.stop()
+                broadcastSpatialAudioFailure(mode, "The headset motion stream is busy")
+                return
+            }
+            spatialPoseProcessor.reset()
+        } else {
+            stopSpatialTracking("mode_${mode.wireValue}")
+        }
+        val state = rootSpatial.setMode(mode)
+        broadcastSpatialAudioState(mode, state)
+        if (mode == SpatialAudioMode.HEAD_TRACKED && !state.supported) {
+            stopSpatialTracking("spatializer_unavailable")
+        }
+    }
+
+    private fun broadcastSpatialAudioFailure(mode: SpatialAudioMode, error: String) {
+        broadcastSpatialAudioState(mode, SpatialAudioRootState(
+            helperAvailable = false, spatializerAvailable = false, error = error
+        ))
+    }
+
+    private fun broadcastSpatialAudioState(mode: SpatialAudioMode,
+        state: SpatialAudioRootState) {
+        HyperPodsBroadcasts.send(mContext, Intent(HyperPodsAction.ACTION_SPATIAL_AUDIO_STATE).apply {
+            putExtra("mode", mode.wireValue)
+            putExtra("supported", state.supported)
+            putExtra("helper_available", state.helperAvailable)
+            putExtra("enabled", state.spatializerEnabled)
+            putExtra("desired", state.desiredMode)
+            putExtra("actual", state.actualMode)
+            putExtra("error", state.error)
+        })
+    }
+
+    private fun feedSpatialPose(packet: ByteArray) {
+        if (!spatialTrackingActive || packet.size < 55) return
+        val sample = spatialPoseProcessor.processRawComponents(
+            littleEndianShort(packet, 43), littleEndianShort(packet, 45),
+            littleEndianShort(packet, 47), System.nanoTime()
+        ) ?: return
+        rootHeadTracker.submit(sample.pose)
+    }
+
+    private fun littleEndianShort(data: ByteArray, offset: Int): Int =
+        (data[offset + 1].toInt() shl 8) or (data[offset].toInt() and 0xff)
 
     private fun headTrackingSupported() = currentPodsInfo?.modelNumber?.let(AirPodsModels::getModelByModelNumber)
         ?.capabilities?.contains(Capability.HEAD_GESTURES) == true
@@ -410,6 +531,10 @@ object L2CAPController {
             }
             HyperPodsAction.ACTION_PODS_DIAGNOSTICS_REQUEST -> sendDiagnostics(force = true)
             HyperPodsAction.ACTION_REQUEST_CONTROL_OWNERSHIP -> requestControlOwnership()
+            HyperPodsAction.ACTION_SPATIAL_AUDIO_APPLY -> {
+                requestedSpatialAudioMode = SpatialAudioMode.fromWire(intent.getStringExtra("mode"))
+                scheduleSpatialAudioApply()
+            }
             HyperPodsAction.ACTION_PODS_UI_INIT -> {
                 Log.i(TAG, "UI Init")
 
@@ -451,25 +576,29 @@ object L2CAPController {
             HyperPodsAction.ACTION_PODS_RENAME -> {
                 val name = intent.getStringExtra("name")?.trim() ?: return
                 if (name.isEmpty() || '\u0000' in name || name.toByteArray().size > 255 || pendingRename != null) return
+                val manager = aacpManager ?: return
                 findHeadphoneRoute(routes) // Capture stable identity before the display name changes.
-                if (aacpManager?.sendRename(name) != true) {
+                if (currentPodsInfo?.modelNumber?.let(AirPodsModels::getModelByModelNumber)
+                        ?.requiresLegacyAapInitialization == true) ensureControlOwnership(manager)
+                if (!manager.sendRename(name)) {
                     sendSettingResult(PodsSettings.RENAME, false, status = "write_failed")
                     return
                 }
                 pendingRename = name
-                sendSettingResult(PodsSettings.RENAME, false, pending = true)
+                // AirPods Pro 2 does not reliably echo RENAME. LibrePods treats the
+                // accepted transport write as success and updates the Android alias
+                // immediately; a later 0x1D name report remains authoritative.
+                applyBluetoothAlias(name)
+                sendSettingResult(PodsSettings.RENAME, true, status = "sent")
                 val generation = sessionId
                 renameTimeout = CoroutineScope(Dispatchers.Default).launch {
                     delay(6000)
                     synchronized(this@L2CAPController) {
                         ensureActive()
-                        if (sessionId == generation && pendingRename == name) {
-                            pendingRename = null
-                            sendSettingResult(PodsSettings.RENAME, false)
-                        }
+                        if (sessionId == generation && pendingRename == name) pendingRename = null
                     }
                 }
-                aacpManager?.sendNotificationRequest()
+                manager.sendNotificationRequest()
             }
 
             HyperPodsAction.ACTION_EAR_DETECTION_SWITCH_CHANGED -> {
@@ -646,6 +775,84 @@ object L2CAPController {
         }
     }
 
+    private fun applyBluetoothAlias(name: String) {
+        if (!::mDevice.isInitialized) return
+        runCatching {
+            if (mDevice.setAlias(name) != BluetoothStatusCodes.SUCCESS) {
+                Log.w(TAG, "Bluetooth alias update was rejected")
+            }
+        }.onFailure { Log.w(TAG, "Unable to update Bluetooth alias", it) }
+    }
+
+    /** LibrePods reclaims AACP ownership when the local phone starts playing.
+     * An explicit local control action is the same intent: send ownership in the
+     * serialized writer queue before the user's renamed/noise command. */
+    private fun ensureControlOwnership(manager: AACPManager) {
+        val owns = manager.getControlCommandStatus(
+            AACPManager.Companion.ControlCommandIdentifiers.OWNS_CONNECTION
+        )?.value?.firstOrNull()?.toInt()?.and(0xff)
+        if (owns == 1 || ownershipAsserted) return
+        ownershipAsserted = manager.sendControlCommand(
+            AACPManager.Companion.ControlCommandIdentifiers.OWNS_CONNECTION.value, 1
+        )
+        if (!ownershipAsserted) Log.w(TAG, "Unable to queue AACP ownership request")
+    }
+
+    /** LibrePods v1.0.10 replays this bootstrap on legacy Pro firmware. Pro 2 can
+     * keep the control socket open while ignoring LISTENING_MODE/RENAME when only
+     * the initial one-shot handshake was sent. */
+    private fun scheduleLegacyAapInitialization(manager: AACPManager, generation: Long) {
+        legacyInitializationJob?.cancel()
+        legacyInitializationJob = CoroutineScope(Dispatchers.Default).launch {
+            for ((waitMs, includeEq) in listOf(700L to true, 1500L to false, 3000L to false)) {
+                delay(waitMs)
+                val eligible = synchronized(this@L2CAPController) {
+                    if (sessionId != generation || aacpManager !== manager || !manager.socket.isConnected) false
+                    else currentPodsInfo?.modelNumber?.let(AirPodsModels::getModelByModelNumber)
+                        ?.requiresLegacyAapInitialization == true
+                }
+                if (!eligible) continue
+                synchronized(this@L2CAPController) {
+                    ensureActive()
+                    if (sessionId != generation || aacpManager !== manager) return@launch
+                    manager.sendHandshake()
+                    manager.sendSetFeatureFlagsPacket()
+                    manager.sendNotificationRequest()
+                    manager.sendProximityKeysRequest()
+                    if (includeEq) manager.sendEqEnableNotification()
+                }
+            }
+        }
+    }
+
+    /** A replayed LISTENING_MODE value is idempotent. Some Pro 2 firmware applies
+     * the command but never echoes it, so resend once rather than turning a
+     * transport-accepted change into a misleading "not confirmed" failure. */
+    private fun scheduleNoiseModeRetry(manager: AACPManager, value: Int, generation: Long) {
+        noiseModeRetryJob?.cancel()
+        noiseModeRequestedValue = value
+        noiseModeRetryJob = CoroutineScope(Dispatchers.Default).launch {
+            for (waitMs in listOf(900L, 1800L)) {
+                delay(waitMs)
+                val retry = synchronized(this@L2CAPController) {
+                    sessionId == generation && aacpManager === manager && manager.socket.isConnected &&
+                        manager.reportedControlValue(
+                            AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE
+                        ) != value
+                }
+                if (!retry) return@launch
+                synchronized(this@L2CAPController) {
+                    ensureActive()
+                    if (sessionId != generation || aacpManager !== manager) return@launch
+                    ensureControlOwnership(manager)
+                    manager.sendControlCommand(
+                        AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE.value, value
+                    )
+                }
+            }
+        }
+    }
+
     private fun sendSettingResult(key: String, success: Boolean, pending: Boolean = false,
         status: String = if (pending) "sent" else if (success) "confirmed" else "timeout") {
         if (key == PodsSettings.NOISE_MODE && !success && !pending) singlePodAnc.requestFailed()
@@ -686,6 +893,9 @@ object L2CAPController {
         val identifier = PodsSettings.identifiers[key] ?: return
         if (key == HyperPodsPrefsKey.SWIPE_SPEED) lastSwipeRequest = value
         val manager = aacpManager
+        val legacyOptimistic = model?.requiresLegacyAapInitialization == true &&
+            key in setOf(PodsSettings.NOISE_MODE, HyperPodsPrefsKey.ALLOW_OFF_OPTION)
+        if (legacyOptimistic) manager?.let(::ensureControlOwnership)
         if (key == HyperPodsPrefsKey.SWIPE_SPEED) manager?.beginProtocolEvidence("swipe")
         val written = if (key == HyperPodsPrefsKey.CHIME_VOLUME && manager != null) {
             // Change only the volume; retain the second configuration byte from the headset.
@@ -695,7 +905,7 @@ object L2CAPController {
                 return
             }
             manager.sendControlCommand(identifier.value, byteArrayOf(value.toByte(), second))
-        } else manager?.sendControlCommand(identifier.value, value) == true
+        } else manager?.sendControlCommand(identifier.value, byteArrayOf(value.toByte()), updateLocally = legacyOptimistic) == true
         if (!written) {
             failedSettings[key] = value
             sendSettingResult(key, false, status = "write_failed")
@@ -703,13 +913,15 @@ object L2CAPController {
         }
         if (key == HyperPodsPrefsKey.SINGLE_POD_ANC && value != 1) cancelSinglePodAncRestore()
         failedSettings.remove(key)
-        if (key in PodsSettings.optimistic) {
+        if (key in PodsSettings.optimistic || legacyOptimistic) {
             // Follow LibrePods: publish the local value without awaiting an echo.
             if (key == HyperPodsPrefsKey.CONVERSATION_AWARENESS && value != 1) {
                 conversationAwarenessActive = false
                 resetConversationVolume()
             }
             sendSettingResult(key, true, status = "sent")
+            if (key == PodsSettings.NOISE_MODE && manager != null)
+                scheduleNoiseModeRetry(manager, value, sessionId)
             return
         }
         // Other settings still require a matching headset report.
@@ -1089,6 +1301,10 @@ object L2CAPController {
             headGestures = settings.headGestures
             updateHeadGestures()
         }
+        if (requestedSpatialAudioMode != settings.spatialAudioMode) {
+            requestedSpatialAudioMode = settings.spatialAudioMode
+            scheduleSpatialAudioApply(300)
+        }
         if (remindersChanged && batteryStateValid && ::currentBatteryParams.isInitialized)
             systemIntegrations.updateBattery(mContext, currentBatteryParams, mDevice, lowBatterySettings,
                 modelNumber = currentPodsInfo?.modelNumber, batteryNotificationSettings = batteryNotificationSettings, controlGeneration = sessionId)
@@ -1163,6 +1379,10 @@ object L2CAPController {
 
         override fun onInitializationStageChanged(stage: AACPManager.InitializationStage) {
             synchronized(this@L2CAPController) { updateHeadGestures() }
+            if (stage == AACPManager.InitializationStage.STATUS &&
+                requestedSpatialAudioMode == SpatialAudioMode.HEAD_TRACKED && !spatialTrackingActive) {
+                scheduleSpatialAudioApply(500)
+            }
         }
 
         override fun onEarDetectionReceived(earDetection: ByteArray) {
@@ -1228,6 +1448,11 @@ object L2CAPController {
                 sendSettingsState()
             }
             if (command.identifier == AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE.value) {
+                if (noiseModeRequestedValue != null && noiseModeRequestedValue == value) {
+                    noiseModeRequestedValue = null
+                    noiseModeRetryJob?.cancel()
+                    noiseModeRetryJob = null
+                }
                 AirPodsNotifications.ANC.setStatus(byteArrayOf(command.value.takeIf { it.isNotEmpty() }?.get(0) ?: 0x00.toByte()))
                 currentAnc = AirPodsNotifications.ANC.status
                 changeUIAncStatus(currentAnc)
@@ -1261,9 +1486,13 @@ object L2CAPController {
                     modelNumber = deviceInformation.modelNumber, batteryNotificationSettings = batteryNotificationSettings, controlGeneration = sessionId)
             }
             sendConnectedStatus()
+            if (requestedSpatialAudioMode != SpatialAudioMode.OFF && !spatialTrackingActive) {
+                scheduleSpatialAudioApply(500)
+            }
         }
 
         override fun onHeadTrackingReceived(headTracking: ByteArray) {
+            feedSpatialPose(headTracking)
             headGestureCalls?.onPacket(headTracking)
             headPreview.onPacket(headTracking, SystemClock.elapsedRealtime())
         }
@@ -1286,6 +1515,7 @@ object L2CAPController {
         }
 
         override fun onOwnershipChangeReceived(owns: Boolean) {
+            ownershipAsserted = owns
             if (ownershipRequestStatus != "idle") {
                 ownershipRequestJob?.cancel()
                 ownershipRequestJob = null
@@ -1337,6 +1567,7 @@ object L2CAPController {
             this.addAction(HyperPodsAction.ACTION_PODS_STATUS_RETRY)
             this.addAction(HyperPodsAction.ACTION_PODS_DIAGNOSTICS_REQUEST)
             this.addAction(HyperPodsAction.ACTION_HEAD_TRACKING_COMMAND)
+            this.addAction(HyperPodsAction.ACTION_SPATIAL_AUDIO_APPLY)
             if (BuildConfig.BUILD_TYPE == "debug") this.addAction(HyperPodsAction.ACTION_REQUEST_CONTROL_OWNERSHIP)
             this.addAction(TelephonyManager.ACTION_PHONE_STATE_CHANGED)
         }, Context.RECEIVER_EXPORTED)
@@ -1504,6 +1735,7 @@ object L2CAPController {
                 sendConnectedStatus()
             }
             if (!manager.requestInitialStatus()) throw java.io.IOException("Initial handshake write failed")
+            scheduleLegacyAapInitialization(manager, thisSession)
             statusRequestJob = launch(Dispatchers.Default) {
                 // Retry the missing protocol step on this socket. The reader is already active.
                 for ((index, waitMs) in listOf(1000L, 2000L, 4000L, 8000L, 15000L).withIndex()) {
@@ -1580,10 +1812,18 @@ object L2CAPController {
         pendingRename = null
         renameTimeout?.cancel()
         renameTimeout = null
+        noiseModeRequestedValue = null
+        noiseModeRetryJob?.cancel()
+        noiseModeRetryJob = null
     }
 
     private fun resetControlState() {
         clearOwnershipRequest()
+        ownershipAsserted = false
+        spatialApplyJob?.cancel()
+        spatialApplyJob = null
+        legacyInitializationJob?.cancel()
+        legacyInitializationJob = null
         lastSwipeRequest = null
         speakerSwitchJob?.cancel()
         speakerSwitchJob = null
@@ -1616,6 +1856,9 @@ object L2CAPController {
     fun disconnectedPod(context: Context, device: BluetoothDevice) {
         if (::mDevice.isInitialized && device != mDevice) return
         clearOwnershipRequest()
+        ownershipAsserted = false
+        legacyInitializationJob?.cancel()
+        legacyInitializationJob = null
         lastSwipeRequest = null
         singlePodAnc.reset()
         singlePodAncRestoreAttempts = 0

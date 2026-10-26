@@ -34,6 +34,8 @@ open class AirPodsBase(
     val capabilities: Set<Capability>,
     val headTrackingVariant: HeadTrackingStream.Variant = HeadTrackingStream.Variant.ALTERNATE,
     val needsSinglePodAncRecovery: Boolean = false,
+    /** Pro 1/Pro 2 firmware accepts settings more reliably after LibrePods' repeated bootstrap. */
+    val requiresLegacyAapInitialization: Boolean = false,
 ) {
     fun supports(capability: Capability): Boolean = capability in capabilities
 }
@@ -198,7 +200,8 @@ class AirPodsPro1: AirPodsBase(
         Capability.PRESS_TIMING,
         Capability.MICROPHONE_SELECTION,
         Capability.TONE_VOLUME
-    )
+    ),
+    requiresLegacyAapInitialization = true,
 )
 
 class AirPodsPro2Lightning: AirPodsBase(
@@ -224,7 +227,8 @@ class AirPodsPro2Lightning: AirPodsBase(
         Capability.PRESS_TIMING,
         Capability.MICROPHONE_SELECTION,
         Capability.TONE_VOLUME
-    )
+    ),
+    requiresLegacyAapInitialization = true,
 )
 
 class AirPodsPro2USBC: AirPodsBase(
@@ -250,7 +254,8 @@ class AirPodsPro2USBC: AirPodsBase(
         Capability.PRESS_TIMING,
         Capability.MICROPHONE_SELECTION,
         Capability.TONE_VOLUME
-    )
+    ),
+    requiresLegacyAapInitialization = true,
 )
 
 class AirPodsPro3: AirPodsBase(

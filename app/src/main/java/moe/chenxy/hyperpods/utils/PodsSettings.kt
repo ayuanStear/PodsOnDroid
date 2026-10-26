@@ -29,6 +29,9 @@ object PodsSettings {
 
     // LibrePods publishes these controls after a successful write. A later headset
     // report is still authoritative; sending is not evidence that firmware applied it.
+    // AirPods Pro 2 does not echo an ALLOW_OFF_OPTION or LISTENING_MODE write reliably.
+    // Those two are published locally only for models that require the legacy bootstrap;
+    // newer models keep the previous report-confirmed behavior.
     val optimistic = setOf(Key.PERSONLIZED_VOLUME, Key.CONVERSATION_AWARENESS, Key.SLEEP_DETECTION,
         Key.MICROPHONE_MODE, Key.LISTENING_MODE_BYTE, Key.CHIME_VOLUME,
         Key.ADJUST_VOLUME_BY_SWIPER, Key.SINGLE_POD_ANC)

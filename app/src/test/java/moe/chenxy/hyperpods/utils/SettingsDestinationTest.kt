@@ -33,7 +33,7 @@ class SettingsDestinationTest {
 
     @Test fun diagnosticActionsAreAtLeastOneMenuBelowSettingsRoot() {
         for (tool in listOf(SettingsDestination.CONNECTION, SettingsDestination.MODULES,
-            SettingsDestination.HEAD_TRACKING, SettingsDestination.LID_OBSERVATION)) {
+            SettingsDestination.HEAD_TRACKING, SettingsDestination.SPATIAL_AUDIO, SettingsDestination.LID_OBSERVATION)) {
             assertEquals(SettingsDestination.TOOLS, tool.parent)
             assertFalse(tool in SettingsDestination.ROOT.children(true, hyperOS))
         }

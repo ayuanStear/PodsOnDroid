@@ -3,7 +3,7 @@
     <string name="setting_select_to_apply">Not read yet; select to set</string>
     <string name="settings_reading">Waiting for headset settings</string>
     <string name="setting_pending">Waiting for headset confirmation…</string>
-    <string name="setting_applied">Headset name confirmed</string>
+    <string name="setting_applied">Name sent. Android immediately uses the new Bluetooth name; re-pair if the old name remains.</string>
     <string name="setting_failed">The headset did not confirm the change. Check the connection and try again.</string>
     <string name="setting_sent">Command sent. Some firmware does not report this setting; check the actual headset behavior.</string>
     <string name="setting_reported">Current state reported by the headset</string>
@@ -18,4 +18,20 @@
     <string name="off_mode_enable_on_select">Selecting Off first enables the headset’s Off option. Loud sound protection is inactive in this mode.</string>
     <string name="long_press_shared">Noise control cycle (both earbuds)</string>
     <string name="long_press_shared_summary">Choose at least two modes. This cycle is shared by both earbuds.</string>
+
+    <string name="spatial_audio_title">Spatial audio</string>
+    <string name="spatial_audio_summary">Off, fixed, and head-tracked output through Android Spatializer</string>
+    <string name="spatial_audio_intro">Uses Android hidden Spatializer and a root UHID head tracker. Head-tracked mode requires root, the Arm64 helper, active AirPods audio, and a synchronized control connection.</string>
+    <string name="spatial_audio_off">Off</string>
+    <string name="spatial_audio_off_summary">Disable the system spatializer for the current output.</string>
+    <string name="spatial_audio_fixed">Fixed</string>
+    <string name="spatial_audio_fixed_summary">Enable spatial audio without following head rotation.</string>
+    <string name="spatial_audio_head_tracked">Head tracked</string>
+    <string name="spatial_audio_head_tracked_summary">Follow AirPods head motion through the root UHID bridge.</string>
+    <string name="spatial_audio_applying">Applying spatial audio mode…</string>
+    <string name="spatial_audio_status_enabled">Spatializer is enabled.</string>
+    <string name="spatial_audio_status_disabled">Spatializer is off.</string>
+    <string name="spatial_audio_status_head_tracked">Head-tracked spatial audio is active.</string>
+    <string name="spatial_audio_helper_unavailable">Root UHID head tracker is unavailable. Check root permission and /dev/uhid.</string>
+    <string name="spatial_audio_unsupported">This ROM does not expose the required Spatializer controls.</string>
 </resources>

@@ -42,3 +42,8 @@
 -allowaccessmodification
 -overloadaggressively
 -renamesourcefileattribute SourceFile
+
+# app_process invokes this class by name from the root Spatializer helper.
+-keep class moe.chenxy.hyperpods.utils.spatial.SpatializerRootCommand {
+    public static void main(java.lang.String[]);
+}

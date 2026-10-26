@@ -29,4 +29,6 @@ object HyperPodsAction {
     const val ACTION_HEAD_TRACKING_SAMPLE = "com.hxlh50k.pods.action.head_tracking_sample"
     const val ACTION_REQUEST_CONTROL_OWNERSHIP = "com.hxlh50k.pods.action.request_control_ownership"
     const val ACTION_PODS_STATUS_CHANGED = "com.hxlh50k.pods.action.pods_status_changed"
+    const val ACTION_SPATIAL_AUDIO_APPLY = "com.hxlh50k.pods.action.spatial_audio_apply"
+    const val ACTION_SPATIAL_AUDIO_STATE = "com.hxlh50k.pods.action.spatial_audio_state"
 }

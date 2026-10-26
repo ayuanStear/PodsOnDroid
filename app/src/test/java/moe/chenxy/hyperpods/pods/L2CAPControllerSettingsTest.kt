@@ -352,30 +352,37 @@ class L2CAPControllerSettingsTest {
         field("pausedAudio").setBoolean(controller, false)
     }
 
-    @Test fun selectingOffEnablesTheOptionAndWaitsForConfirmationBeforeChangingMode() {
+    @Test fun legacyProOffSelectionPublishesOwnershipAndBothCommandsImmediately() {
         receive(0x0d, 4)
         receive(0x34, 2)
         controller.setANCMode(1)
-        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x34, 1, 0, 0, 0), output.toByteArray())
-        assertTrue(field("pendingOffSelection").getBoolean(controller))
-        receive(0x34, 2) // A stale state report is not an acknowledgement.
-        assertEquals(11, output.size())
-        receive(0x34, 1)
-        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x34, 1, 0, 0, 0,
-            4, 0, 4, 0, 9, 0, 0x0d, 1, 0, 0, 0), output.toByteArray())
+        val ownership = manager.createDataPacket(
+            manager.createControlCommandPacket(0x06, byteArrayOf(1)))
+        val allowOff = manager.createDataPacket(
+            manager.createControlCommandPacket(0x34, byteArrayOf(1)))
+        val off = manager.createDataPacket(
+            manager.createControlCommandPacket(0x0d, byteArrayOf(1)))
+        assertArrayEquals(ownership + allowOff + off, output.toByteArray())
         assertFalse(field("pendingOffSelection").getBoolean(controller))
-        assertTrue(pending().containsKey(PodsSettings.NOISE_MODE))
+        assertTrue(pending().isEmpty())
         assertEquals(PodsSettings.NOISE_MODE, field("lastSettingKey").get(controller))
         assertEquals("sent", field("lastSettingStatus").get(controller))
-        assertEquals(4.toByte(), manager.getControlCommandStatus(AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE)!!.value[0])
+        assertEquals(1.toByte(), manager.getControlCommandStatus(
+            AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE)!!.value[0])
+        receive(0x34, 1)
         receive(0x0d, 1)
         assertTrue(pending().isEmpty())
     }
 
-    @Test fun alreadyEnabledOffDoesNotRewriteTheOption() {
+    @Test fun alreadyEnabledOffStillQueuesOwnershipBeforeTheModeCommand() {
         receive(0x34, 1)
         controller.setANCMode(1)
-        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x0d, 1, 0, 0, 0), output.toByteArray())
+        val ownership = manager.createDataPacket(
+            manager.createControlCommandPacket(0x06, byteArrayOf(1)))
+        val off = manager.createDataPacket(
+            manager.createControlCommandPacket(0x0d, byteArrayOf(1)))
+        assertArrayEquals(ownership + off, output.toByteArray())
+        assertTrue(pending().isEmpty())
     }
 
     @Test fun failedOptionWriteCancelsOffSelectionWithoutSendingMode() {
@@ -387,18 +394,16 @@ class L2CAPControllerSettingsTest {
         assertTrue(pending().isEmpty())
     }
 
-    @Test fun offOptionTimeoutNeverSendsOffAndAllowsAnotherClick() {
+    @Test fun legacyProOffSelectionAllowsAnotherClickWithoutRepeatingOwnershipOrAllowOff() {
         controller.setANCMode(1)
         field("mContext").set(controller, null)
-        val deadline = System.nanoTime() + 7_000_000_000L
-        while (synchronized(controller) { pending().isNotEmpty() } && System.nanoTime() < deadline) Thread.sleep(20)
         assertFalse(field("pendingOffSelection").getBoolean(controller))
-        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x34, 1, 0, 0, 0) +
-            manager.createDataPacket(manager.createRequestNotificationPacket()), output.toByteArray())
+        assertTrue(pending().isEmpty())
         field("mContext").set(controller, ContextWrapper(null))
+        output.reset()
         controller.setANCMode(1)
-        assertTrue(field("pendingOffSelection").getBoolean(controller))
-        assertEquals(32, output.size())
+        assertEquals(11, output.size())
+        assertFalse(field("pendingOffSelection").getBoolean(controller))
     }
 
     private fun initialReady(): Boolean = type.getDeclaredMethod("initialStatusReady")
@@ -480,27 +485,27 @@ class L2CAPControllerSettingsTest {
         assertFalse(controller.currentBatteryParams.left!!.isConnected)
     }
 
-    @Test fun disconnectAbandonsTheOffPrerequisiteAndCannotSendALateModeCommand() {
+    @Test fun disconnectCannotCancelAnAlreadyQueuedLegacyProOffSelection() {
         controller.setANCMode(1)
         field("mContext").set(controller, null)
         controller.disconnectedPod(ContextWrapper(null), device)
         receive(0x34, 1)
         assertFalse(field("pendingOffSelection").getBoolean(controller))
         assertTrue(pending().isEmpty())
-        assertEquals(11, output.size())
+        assertEquals(33, output.size())
     }
 
-    @Test fun offPrerequisiteCanCompleteAfterItsSingleBoundedStatusRefresh() {
+    @Test fun legacyProOffSelectionRetriesTheIdempotentModeWithoutAnEchoPrerequisite() {
         controller.setANCMode(1)
-        // Timer broadcasts use no-op stubs here; the protocol writer remains real.
         field("mContext").set(controller, null)
         Thread.sleep(3300)
         synchronized(controller) {
-            assertEquals(21, output.size()) // Allow Off + one status subscription.
-            assertTrue(pending().containsKey(Key.ALLOW_OFF_OPTION))
+            // Initial ownership + Allow Off + Off, followed by two identical mode retries.
+            assertEquals(55, output.size())
+            assertFalse(field("pendingOffSelection").getBoolean(controller))
+            assertTrue(pending().isEmpty())
             receive(0x34, 1)
-            assertTrue(pending().containsKey(PodsSettings.NOISE_MODE))
-            assertEquals(32, output.size()) // Only a confirmed prerequisite sends real Off.
+            assertEquals(55, output.size())
         }
     }
 

@@ -397,14 +397,14 @@ class AACPManager(val socket: BluetoothSocket, private val writer: ((ByteArray) 
         return sendPacket(packet).also { protocolEvidence.packet(packet, it) }
     }
 
-    fun sendControlCommand(identifier: Byte, value: ByteArray): Boolean {
+    fun sendControlCommand(identifier: Byte, value: ByteArray, updateLocally: Boolean = false): Boolean {
         val controlPacket = createControlCommandPacket(identifier, value)
         if (!sendDataPacket(controlPacket)) return false
         if (BuildConfig.DEBUG) Log.d(TAG, "Control command sent: ${"%02X".format(identifier)} - ${value.take(4).joinToString(" ") { "%02X".format(it) }}")
         // Match LibrePods' optimistic UI for selected firmware controls only.
         // Incoming reports remain authoritative; a failed write must not change the cache.
         val id = ControlCommandIdentifiers.fromByte(identifier)
-        if (PodsSettings.keyFor(identifier) in PodsSettings.optimistic && id != null) {
+        if ((updateLocally || PodsSettings.keyFor(identifier) in PodsSettings.optimistic) && id != null) {
             localWrites.add(id)
             setControlCommandStatusValue(id, value)
         }
@@ -1292,9 +1292,14 @@ class AACPManager(val socket: BluetoothSocket, private val writer: ((ByteArray) 
 
         return devices
     }
-    fun sendSomePacketIDontKnowWhatItIs() {
-        // 2900 00ff ffff ffff ffff -- enables setting EQ
-        sendDataPacket(
+    fun sendProximityKeysRequest(): Boolean {
+        val type = (ProximityKeyType.IRK.value + ProximityKeyType.ENC_KEY.value).toByte()
+        return sendRequestProximityKeys(type)
+    }
+
+    fun sendEqEnableNotification(): Boolean {
+        // 2900 00ff ffff ffff ffff -- enables setting EQ.
+        return sendDataPacket(
             byteArrayOf(
                 0x29, 0x00,
                 0x00, 0xFF.toByte(),

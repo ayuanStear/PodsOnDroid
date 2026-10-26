@@ -366,15 +366,28 @@ class AACPManagerTest {
         assertEquals(4, manager.createRenamePacket("🎧")[3].toInt() and 0xff)
     }
 
+    @Test fun legacyProximityAndEqBootstrapPacketsMatchLibrePods() {
+        val socket = mock(BluetoothSocket::class.java)
+        val output = ByteArrayOutputStream()
+        `when`(socket.isConnected).thenReturn(true)
+        `when`(socket.outputStream).thenReturn(output)
+        val session = AACPManager(socket)
+        assertTrue(session.sendProximityKeysRequest())
+        assertTrue(session.sendEqEnableNotification())
+        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 0x30, 0, 0x05, 0) +
+            byteArrayOf(4, 0, 4, 0, 0x29, 0, 0, -1, -1, -1, -1, -1, -1, -1),
+            output.toByteArray())
+    }
+
     @Test fun otherSettingsStillRequireReportsForEverySendOverload() {
         val socket = mock(BluetoothSocket::class.java)
         `when`(socket.isConnected).thenReturn(true)
         `when`(socket.outputStream).thenReturn(ByteArrayOutputStream())
         val sender = AACPManager(socket)
-        assertTrue(sender.sendControlCommand(0x34, true))
-        assertTrue(sender.sendControlCommand(0x34, 2))
-        assertTrue(sender.sendControlCommand(0x34, 1.toByte()))
-        assertTrue(sender.sendControlCommand(0x34, byteArrayOf(2)))
+        assertTrue(sender.sendControlCommand(0x20, true))
+        assertTrue(sender.sendControlCommand(0x20, 2))
+        assertTrue(sender.sendControlCommand(0x20, 1.toByte()))
+        assertTrue(sender.sendControlCommand(0x20, byteArrayOf(2)))
         assertTrue(sender.controlCommandStatusList.isEmpty())
     }
 

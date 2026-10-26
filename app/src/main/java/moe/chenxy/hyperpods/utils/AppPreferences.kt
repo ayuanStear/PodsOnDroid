@@ -9,6 +9,7 @@ import android.util.Log
 import moe.chenxy.hyperpods.BuildConfig
 import moe.chenxy.hyperpods.utils.data.HyperPodsAction
 import moe.chenxy.hyperpods.utils.data.HyperPodsPrefsKey as Key
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
 import org.json.JSONObject
 import java.io.File
 import java.io.FileNotFoundException
@@ -36,6 +37,7 @@ object AppPreferences {
         val batteryNotifications: BatteryNotificationSettings = BatteryNotificationSettings(),
         val batteryNotificationsMigrationRequired: Boolean = false,
         val allowUnfinishedFeatures: Boolean = false,
+        val spatialAudioMode: SpatialAudioMode = SpatialAudioMode.OFF,
     ) {
         fun encode(): String {
             require(batteryNotifications.valid) { "Battery thresholds must satisfy 1 <= low < medium <= 99" }
@@ -54,6 +56,7 @@ object AppPreferences {
                 Key.BATTERY_NOTIFICATION_MEDIUM_REMINDER to batteryNotifications.mediumReminderEnabled,
                 Key.BATTERY_NOTIFICATIONS_MIGRATION_REQUIRED to batteryNotificationsMigrationRequired,
                 Key.ALLOW_UNFINISHED_FEATURES to allowUnfinishedFeatures,
+                Key.SPATIAL_AUDIO_MODE to spatialAudioMode.wireValue,
             )).toString()
         }
     }
@@ -101,6 +104,9 @@ object AppPreferences {
                     (json.has(Key.LOW_BATTERY_EARS) && json.opt(Key.LOW_BATTERY_EARS) !is Boolean),
                 if (json.has(Key.ALLOW_UNFINISHED_FEATURES))
                     json.get(Key.ALLOW_UNFINISHED_FEATURES) as Boolean else false,
+                SpatialAudioMode.fromWire(
+                    if (json.has(Key.SPATIAL_AUDIO_MODE)) json.getString(Key.SPATIAL_AUDIO_MODE) else null
+                ),
             )
         } catch (_: Exception) {
             Log.w("HyperPods-Preferences", "Rejected app settings: malformed JSON, missing field, or invalid field type")

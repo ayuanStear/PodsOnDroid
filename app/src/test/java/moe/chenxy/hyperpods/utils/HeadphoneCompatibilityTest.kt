@@ -30,6 +30,15 @@ class HeadphoneCompatibilityTest {
         }
     }
 
+    @Test fun onlyLegacyProModelsRequireTheLibrePodsRepeatedBootstrap() {
+        val legacy = setOf("A2083", "A2084", "A2698", "A2699", "A2931", "A3047", "A3048", "A3049")
+        AirPodsModels.models.forEach { model ->
+            model.modelNumber.forEach { number ->
+                assertEquals(number in legacy, model.requiresLegacyAapInitialization)
+            }
+        }
+    }
+
     @Test fun futureModelsDoNotInheritUndeclaredSettingFeatures() {
         val model = AirPodsBase(listOf("future"), "Future", budCaseRes = 0, budsRes = 0,
             leftBudsRes = 0, rightBudsRes = 0, caseRes = 0, capabilities = emptySet())

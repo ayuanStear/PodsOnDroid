@@ -23,6 +23,23 @@ normal/zero motion, RTL, opaque fallback and popup-host regression coverage.
 The user accepted the visual effect on the HyperOS 4 test phone. Broader
 GPU/performance acceptance remains separate.
 
+## AirPods Pro 2 compatibility build
+
+This local build targets the Pro 2 control failures reported on 2026-10-26:
+
+- Pro 1/Pro 2 sessions replay the LibrePods v1.0.10 bootstrap packet sequence.
+- Local noise/rename commands assert AACP connection ownership first.
+- `ALLOW_OFF_OPTION` and `LISTENING_MODE` are published locally for legacy Pro
+  firmware, retried idempotently, and later corrected by any real headset report.
+- Rename updates the Android Bluetooth alias immediately instead of waiting for a
+  `0x1D` echo that Pro 2 firmware frequently omits.
+- Settings to Tools to Spatial audio adds Off, Fixed, and Head tracked modes using
+  Android's hidden Spatializer and the packaged arm64 UHID helper.
+
+The debug build uses package `com.hxlh50k.pods.debug`. Enable that module package
+in the LSPosed/KernelSU module manager and keep the same Bluetooth/SystemUI scopes
+as the release package. Head-tracked spatial audio requires root and `/dev/uhid`.
+
 ## Compatibility structure
 
 Phone-system integrations and headphone features are independent runtime

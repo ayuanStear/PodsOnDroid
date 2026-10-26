@@ -8,7 +8,7 @@ class HeadTrackingStream(
     private val selectVariant: () -> Variant = { Variant.ALTERNATE },
     private val send: (start: Boolean) -> Boolean
 ) {
-    enum class Owner { CALL, PREVIEW }
+    enum class Owner { CALL, SPATIAL, PREVIEW }
     enum class Variant { ALTERNATE, STANDARD, AIRPODS5 }
     private var owner: Owner? = null
     private var interrupted: (() -> Unit)? = null
@@ -23,9 +23,12 @@ class HeadTrackingStream(
         if (stopPending && !retryStop()) return false
         if (owner == request) return true
         if (owner == Owner.CALL) return false
-        if (owner == Owner.PREVIEW) {
+        // A call may preempt spatial/preview; spatial may preempt only preview.
+        if (owner == Owner.SPATIAL && request != Owner.CALL) return false
+        if (owner == Owner.PREVIEW || (owner == Owner.SPATIAL && request == Owner.CALL)) {
+            val current = owner!!
             val callback = interrupted
-            if (!release(Owner.PREVIEW)) {
+            if (!release(current)) {
                 callback?.invoke()
                 return false
             }
