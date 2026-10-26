@@ -1,6 +1,5 @@
 package moe.chenxy.hyperpods.ui
 
-import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 
@@ -38,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.paneTitle
@@ -47,8 +45,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import moe.chenxy.hyperpods.R
-import moe.chenxy.hyperpods.SpatialAudioActivity
 import moe.chenxy.hyperpods.pods.NoiseControlMode
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
+import moe.chenxy.hyperpods.utils.spatial.isBinauralWear
 import moe.chenxy.hyperpods.ui.components.DashboardBattery
 import moe.chenxy.hyperpods.ui.components.ChimeVolumeSlider
 import moe.chenxy.hyperpods.ui.components.DashboardHero
@@ -58,6 +57,7 @@ import moe.chenxy.hyperpods.ui.components.dashboardConnectionStatus
 import moe.chenxy.hyperpods.ui.components.DashboardDivider
 import moe.chenxy.hyperpods.ui.components.DashboardLink
 import moe.chenxy.hyperpods.ui.components.DashboardNoise
+import moe.chenxy.hyperpods.ui.components.SpatialAudioSwitch
 import moe.chenxy.hyperpods.ui.components.DashboardSection
 import moe.chenxy.hyperpods.ui.components.DashboardToggle
 import moe.chenxy.hyperpods.ui.components.DashboardGroup as Card
@@ -99,6 +99,8 @@ fun PodDetailPage(
     onListeningModeChange: (Byte) -> Unit,
     ancMode: NoiseControlMode?,
     onAncModeChange: (NoiseControlMode) -> Unit,
+    spatialAudioMode: SpatialAudioMode = SpatialAudioMode.OFF,
+    onSpatialAudioModeChange: (SpatialAudioMode) -> Unit = {},
     podsInfo: AACPManager.Companion.AirPodsInformation?,
     onNameChange: (String) -> Unit,
     microphoneMode: Int,
@@ -120,7 +122,7 @@ fun PodDetailPage(
     allowUnfinishedFeatures: Boolean = false,
 ) {
     val model = podsInfo?.let { getModelByModelNumber(it.modelNumber) }
-    val context = LocalContext.current
+    val spatialAvailable = isBinauralWear(earDetectionParams)
     fun ready(key: String) = PodsSettings.editable(key, model, settings, pendingSettings,
         diagnostics?.getString("connection") == "connected", allowUnfinishedFeatures)
     @Composable
@@ -203,6 +205,12 @@ fun PodDetailPage(
                             }
                         }
                     }
+                    item(key = "home_spatial") {
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+                            DashboardSection(stringResource(R.string.spatial_audio_title))
+                            SpatialAudioSwitch(spatialAudioMode, onSpatialAudioModeChange, available = spatialAvailable)
+                        }
+                    }
                     if (PodsSettings.supports(Key.PERSONLIZED_VOLUME, model) || PodsSettings.supports(Key.CONVERSATION_AWARENESS, model)) {
                         item(key = "home_listening") {
                             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -229,11 +237,6 @@ fun PodDetailPage(
                             Card {
                                 DashboardToggle(stringResource(R.string.dashboard_detection_title),
                                     stringResource(R.string.dashboard_detection_summary), earDetectionEnable, onEarDetectionChanged)
-                                DashboardDivider(Modifier.padding(horizontal = 16.dp))
-                                DashboardLink(stringResource(R.string.spatial_audio_title),
-                                    stringResource(R.string.spatial_audio_summary)) {
-                                    context.startActivity(Intent(context, SpatialAudioActivity::class.java))
-                                }
                                 DashboardDivider(Modifier.padding(horizontal = 16.dp))
                                 DashboardLink(stringResource(R.string.dashboard_more),
                                     stringResource(if (model?.capabilities?.contains(Capability.HEAD_GESTURES) == true &&

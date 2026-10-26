@@ -32,6 +32,9 @@ import moe.chenxy.hyperpods.MainActivity
 import moe.chenxy.hyperpods.R
 import moe.chenxy.hyperpods.ui.components.rememberAppPreferences
 import moe.chenxy.hyperpods.pods.NoiseControlMode
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioRuntime
+import moe.chenxy.hyperpods.utils.spatial.isBinauralWear
 import moe.chenxy.hyperpods.utils.AACPManager
 import moe.chenxy.hyperpods.utils.AppPreferences
 import moe.chenxy.hyperpods.utils.HyperPodsBroadcasts
@@ -214,6 +217,13 @@ fun MainUI() {
         }
     }
 
+    fun setSpatialAudioMode(mode: SpatialAudioMode) {
+        if (mode != SpatialAudioMode.OFF && !isBinauralWear(earDetectionParams.value)) return
+        if (savePolicy(AppPreferences.read(context).copy(spatialAudioMode = mode))) {
+            SpatialAudioRuntime.setMode(mode)
+        }
+    }
+
     fun renameAirPods(it: String) {
         HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_PODS_RENAME)
             .putExtra("name", it), HyperPodsBroadcasts.BLUETOOTH)
@@ -267,6 +277,10 @@ fun MainUI() {
             ancMode = ancMode.value,
             onAncModeChange = {
                 setAncMode(it)
+            },
+            spatialAudioMode = appPolicy.spatialAudioMode,
+            onSpatialAudioModeChange = {
+                setSpatialAudioMode(it)
             },
             onNameChange = {
                 renameAirPods(it)
@@ -322,6 +336,8 @@ fun AppHorizontalPager(
     onAdaptiveAudioLevelChange: (Float) -> Unit,
     ancMode: NoiseControlMode?,
     onAncModeChange: (NoiseControlMode) -> Unit,
+    spatialAudioMode: SpatialAudioMode,
+    onSpatialAudioModeChange: (SpatialAudioMode) -> Unit,
     onNameChange: (String) -> Unit,
     microphoneMode: Int,
     onMicrophoneModeChange: (Int) -> Unit,
@@ -372,6 +388,8 @@ fun AppHorizontalPager(
                                 onAdaptiveAudioLevelChange = onAdaptiveAudioLevelChange,
                                 ancMode = ancMode,
                                 onAncModeChange = onAncModeChange,
+                                spatialAudioMode = spatialAudioMode,
+                                onSpatialAudioModeChange = onSpatialAudioModeChange,
                                 podsInfo = currentPodsInfo,
                                 deviceName = deviceName,
                                 isActive = pagerState.currentPage == 0,
