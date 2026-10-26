@@ -49,7 +49,9 @@ import moe.chenxy.hyperpods.utils.HyperPodsBroadcasts
 import moe.chenxy.hyperpods.utils.SystemApisUtils
 import moe.chenxy.hyperpods.utils.SinglePodAnc
 import moe.chenxy.hyperpods.utils.SystemIntegrations
+import moe.chenxy.hyperpods.utils.spatial.SPATIAL_AUDIO_BINAURAL_ERROR
 import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
+import moe.chenxy.hyperpods.utils.spatial.isBinauralWear
 import moe.chenxy.hyperpods.utils.data.BatteryParams
 import moe.chenxy.hyperpods.utils.data.EarDetectionParams
 import moe.chenxy.hyperpods.utils.data.HyperPodsAction
@@ -264,6 +266,11 @@ object L2CAPController {
 
     private suspend fun applySpatialAudioMode() {
         val mode = synchronized(this@L2CAPController) { requestedSpatialAudioMode }
+        if (mode != SpatialAudioMode.OFF && !bothEarsInEar()) {
+            synchronized(this@L2CAPController) { stopSpatialTracking("single_ear") }
+            broadcastSpatialTrackingState(false, SPATIAL_AUDIO_BINAURAL_ERROR)
+            return
+        }
         if (mode == SpatialAudioMode.HEAD_TRACKED) {
             if (!headTrackingReady()) {
                 broadcastSpatialTrackingState(false, "Wait for headset status synchronization, then retry")
@@ -310,9 +317,13 @@ object L2CAPController {
     private fun headTrackingSupported() = currentPodsInfo?.modelNumber?.let(AirPodsModels::getModelByModelNumber)
         ?.capabilities?.contains(Capability.HEAD_GESTURES) == true
 
+    private fun bothEarsInEar(): Boolean =
+        earDetectionStateValid && ::currentEarDetectionParams.isInitialized &&
+            isBinauralWear(currentEarDetectionParams)
+
     private fun headTrackingReady(): Boolean = aacpManager?.let {
         it.socket.isConnected && it.initializationStage == AACPManager.InitializationStage.STATUS &&
-            currentPodsInfo != null && earDetectionStateValid
+            currentPodsInfo != null && bothEarsInEar()
     } == true
 
     private fun headTrackingOwnership(): Int = aacpManager?.getControlCommandStatus(
@@ -934,6 +945,14 @@ object L2CAPController {
             aacpManager?.sendNotificationRequest()
         routeRetryCount = 0
         changeUIInEarStatus(currentEarDetectionParams)
+        if (worn != 2 && requestedSpatialAudioMode != SpatialAudioMode.OFF) {
+            spatialApplyJob?.cancel()
+            spatialApplyJob = null
+            stopSpatialTracking("single_ear")
+            broadcastSpatialTrackingState(false, SPATIAL_AUDIO_BINAURAL_ERROR)
+        } else if (worn == 2 && requestedSpatialAudioMode != SpatialAudioMode.OFF) {
+            scheduleSpatialAudioApply(500)
+        }
         if (worn == 1) enforceSingleEarNoisePolicy("wear_change")
 
         if (batteryStateValid && ::currentBatteryParams.isInitialized) {

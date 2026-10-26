@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import moe.chenxy.hyperpods.utils.HyperPodsBroadcasts
+import moe.chenxy.hyperpods.utils.data.EarDetectionParams
 import moe.chenxy.hyperpods.utils.data.HyperPodsAction
 
 /** App-process owner for root Spatializer and UHID operations. Bluetooth only
@@ -23,8 +24,9 @@ object SpatialAudioRuntime {
     private val processor = SpatialHeadPoseProcessor()
     private lateinit var context: Context
     private var initialized = false
-    private var requested = SpatialAudioMode.OFF
-    private var lastApplied: SpatialAudioMode? = null
+    @Volatile private var requested = SpatialAudioMode.OFF
+    @Volatile private var lastApplied: SpatialAudioMode? = null
+    @Volatile private var binauralReady = false
     private var applyJob: Job? = null
     @Volatile private var trackingActive = false
 
@@ -33,6 +35,10 @@ object SpatialAudioRuntime {
             if (!HyperPodsBroadcasts.isTrusted(receiverContext, this, HyperPodsBroadcasts.BLUETOOTH)) return
             when (intent.action) {
                 HyperPodsAction.ACTION_SPATIAL_AUDIO_POSE -> submitPose(intent)
+                HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED -> {
+                    val status = intent.getParcelableExtra("status", EarDetectionParams::class.java)
+                    updateBinauralReady(isBinauralWear(status))
+                }
                 HyperPodsAction.ACTION_SPATIAL_AUDIO_TRACKING_STATE -> {
                     if (!intent.getBooleanExtra("tracking_active", false)) {
                         trackingActive = false
@@ -43,10 +49,11 @@ object SpatialAudioRuntime {
                     trackingActive = false
                     bridge.stop()
                     processor.reset()
+                    updateBinauralReady(false)
                 }
                 HyperPodsAction.ACTION_PODS_MAC_RECEIVED -> {
                     val mac = intent.getStringExtra("mac").orEmpty()
-                    if (requested == SpatialAudioMode.HEAD_TRACKED && MAC.matches(mac)) {
+                    if (requested == SpatialAudioMode.HEAD_TRACKED && binauralReady && MAC.matches(mac)) {
                         schedule { startHeadTracked(mac) }
                     }
                 }
@@ -60,6 +67,7 @@ object SpatialAudioRuntime {
         context = appContext.applicationContext
         context.registerReceiver(receiver, IntentFilter().apply {
             addAction(HyperPodsAction.ACTION_SPATIAL_AUDIO_POSE)
+            addAction(HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED)
             addAction(HyperPodsAction.ACTION_SPATIAL_AUDIO_TRACKING_STATE)
             addAction(HyperPodsAction.ACTION_PODS_DISCONNECTED)
             addAction(HyperPodsAction.ACTION_PODS_MAC_RECEIVED)
@@ -67,6 +75,7 @@ object SpatialAudioRuntime {
         initialized = true
     }
 
+    @Synchronized
     fun setMode(mode: SpatialAudioMode) {
         if (!initialized) {
             Log.w(TAG, "Runtime used before initialization")
@@ -79,12 +88,27 @@ object SpatialAudioRuntime {
         applyJob = scope.launch { apply(mode) }
     }
 
+    private fun updateBinauralReady(ready: Boolean) {
+        if (binauralReady == ready) return
+        binauralReady = ready
+        val mode = requested
+        if (!ready) {
+            if (lastApplied != SpatialAudioMode.OFF) schedule { applyBinauralRestriction() }
+        } else if (mode != SpatialAudioMode.OFF && lastApplied != mode) {
+            schedule { apply(mode) }
+        }
+    }
+
     private fun schedule(block: suspend () -> Unit) {
         applyJob?.cancel()
         applyJob = scope.launch { block() }
     }
 
     private suspend fun apply(mode: SpatialAudioMode) {
+        if (mode != SpatialAudioMode.OFF && !binauralReady) {
+            applyBinauralRestriction()
+            return
+        }
         trackingActive = false
         processor.reset()
         HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_SPATIAL_AUDIO_APPLY)
@@ -118,14 +142,27 @@ object SpatialAudioRuntime {
                     error = "Waiting for the Bluetooth headset address",
                 ))
                 Log.i(TAG, "Waiting for the Bluetooth headset address")
-        HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_GET_PODS_MAC),
+                HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_GET_PODS_MAC),
                     HyperPodsBroadcasts.BLUETOOTH)
             }
         }
     }
 
+    private suspend fun applyBinauralRestriction() {
+        trackingActive = false
+        processor.reset()
+        bridge.stop()
+        val controller = RootSpatialAudioController(context.applicationInfo.sourceDir)
+        val state = controller.setMode(SpatialAudioMode.OFF).copy(
+            error = SPATIAL_AUDIO_BINAURAL_ERROR,
+        )
+        lastApplied = SpatialAudioMode.OFF
+        broadcast(state)
+        Log.i(TAG, "Spatial audio suspended until both earbuds are worn")
+    }
+
     private suspend fun startHeadTracked(mac: String) {
-        if (requested != SpatialAudioMode.HEAD_TRACKED) return
+        if (requested != SpatialAudioMode.HEAD_TRACKED || !binauralReady) return
         Log.i(TAG, "Starting root UHID head tracker for the connected AirPods")
         if (!bridge.start(context, mac)) {
             Log.e(TAG, "Root UHID head tracker start failed")
@@ -153,9 +190,9 @@ object SpatialAudioRuntime {
         bridge.submit(sample.pose)
     }
 
-    private fun broadcast(state: SpatialAudioRootState) {
+    private fun broadcast(state: SpatialAudioRootState, mode: SpatialAudioMode = requested) {
         HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_SPATIAL_AUDIO_STATE).apply {
-            putExtra("mode", requested.wireValue)
+            putExtra("mode", mode.wireValue)
             putExtra("supported", state.supported)
             putExtra("helper_available", state.helperAvailable)
             putExtra("enabled", state.spatializerEnabled)

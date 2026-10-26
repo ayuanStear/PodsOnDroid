@@ -42,6 +42,7 @@ import moe.chenxy.hyperpods.utils.PanelModeState
 import moe.chenxy.hyperpods.utils.StatusFreshness
 import moe.chenxy.hyperpods.utils.data.BatteryParams
 import moe.chenxy.hyperpods.utils.data.PodBatteryParams
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
 import top.yukonga.miuix.kmp.basic.Text
 
 private val PanelSecondary = Color.White.copy(alpha = .65f)
@@ -57,9 +58,12 @@ internal fun HeadphonePanelContent(
     modeState: PanelModeState,
     hostPending: Boolean,
     allowedModes: Set<Int>,
+    spatialMode: SpatialAudioMode,
+    spatialAvailable: Boolean,
     maxHeightDp: Float,
     connected: Boolean,
     onMode: (Int) -> Unit,
+    onSpatial: () -> Unit,
     onMore: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -108,6 +112,9 @@ internal fun HeadphonePanelContent(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) }
             Spacer(Modifier.height(8.dp))
         }
+        Spacer(Modifier.height(8.dp))
+        PanelSpatialAudio(spatialMode, spatialAvailable, connected, onSpatial)
+        Spacer(Modifier.height(8.dp))
         PanelVolume(activity, connected)
         Spacer(Modifier.height(24.dp))
         Box(Modifier.fillMaxWidth().heightIn(min = 54.dp).clip(RoundedCornerShape(24.dp))
@@ -172,6 +179,25 @@ private fun PanelNoise(state: PanelModeState, supported: Set<Int>, enabled: Bool
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PanelSpatialAudio(mode: SpatialAudioMode, available: Boolean, connected: Boolean, onOpen: () -> Unit) {
+    val modeLabel = stringResource(when (mode) {
+        SpatialAudioMode.OFF -> R.string.spatial_audio_off
+        SpatialAudioMode.FIXED -> R.string.spatial_audio_fixed
+        SpatialAudioMode.HEAD_TRACKED -> R.string.spatial_audio_head_tracked
+    })
+    val summary = if (!available) stringResource(R.string.spatial_audio_binaural_required) else modeLabel
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(PanelControl)
+        .clickable(enabled = connected, role = Role.Button, onClick = onOpen)
+        .alpha(if (connected) 1f else .45f).padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(stringResource(R.string.spatial_audio_title), color = Color.White, fontSize = 17.sp)
+            Text(summary, color = PanelSecondary, fontSize = 12.sp)
+        }
+        Text(modeLabel, color = PanelSecondary, fontSize = 14.sp)
     }
 }
 

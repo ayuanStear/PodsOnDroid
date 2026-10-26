@@ -65,7 +65,7 @@ class HeadTrackingControllerTest {
         `when`(socket.outputStream).thenReturn(output)
         field("aacpManager").set(controller, initialized(manager))
         field("earDetectionStateValid").setBoolean(controller, true)
-        controller.currentEarDetectionParams = EarDetectionParams(EarDetectionStatus.IN_EAR, EarDetectionStatus.OUT_OF_EAR)
+        controller.currentEarDetectionParams = EarDetectionParams(EarDetectionStatus.IN_EAR, EarDetectionStatus.IN_EAR)
         controller.currentPodsInfo = AACPManager.Companion.AirPodsInformation(
             "Fixture", "A3049", "Apple", "NOT-REAL", "0", "0", "0", "DEMO", "DEMO", "DEMO", "DEMO")
         manager.setPacketCallback(field("packetCallback").get(controller) as AACPManager.PacketCallback)

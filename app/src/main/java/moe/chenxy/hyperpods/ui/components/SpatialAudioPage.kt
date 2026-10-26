@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -33,9 +34,12 @@ import moe.chenxy.hyperpods.BuildConfig
 import moe.chenxy.hyperpods.R
 import moe.chenxy.hyperpods.utils.AppPreferences
 import moe.chenxy.hyperpods.utils.HyperPodsBroadcasts
+import moe.chenxy.hyperpods.utils.data.EarDetectionParams
 import moe.chenxy.hyperpods.utils.data.HyperPodsAction
 import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
+import moe.chenxy.hyperpods.utils.spatial.SPATIAL_AUDIO_BINAURAL_ERROR
 import moe.chenxy.hyperpods.utils.spatial.SpatialAudioRuntime
+import moe.chenxy.hyperpods.utils.spatial.isBinauralWear
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import moe.chenxy.hyperpods.ui.components.DashboardGroup as Card
@@ -66,8 +70,13 @@ fun SpatialAudioPage(isActive: Boolean) {
     var selected by remember { mutableStateOf(AppPreferences.read(context).spatialAudioMode) }
     var status by remember { mutableStateOf(SpatialUiState()) }
     var pending by remember { mutableStateOf<SpatialAudioMode?>(null) }
+    var binauralReady by remember { mutableStateOf(false) }
 
     fun apply(mode: SpatialAudioMode) {
+        if (mode != SpatialAudioMode.OFF && !binauralReady) {
+            status = SpatialUiState(error = SPATIAL_AUDIO_BINAURAL_ERROR)
+            return
+        }
         val snapshot = AppPreferences.read(context).copy(spatialAudioMode = mode)
         if (!AppPreferences.save(context, snapshot)) return
         AppPreferences.publish(context, snapshot)
@@ -84,6 +93,11 @@ fun SpatialAudioPage(isActive: Boolean) {
                     HyperPodsBroadcasts.BLUETOOTH) ||
                     HyperPodsBroadcasts.isTrusted(receiverContext, this, BuildConfig.APPLICATION_ID)
                 if (!trusted) return
+                if (intent.action == HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED) {
+                    val ears = intent.getParcelableExtra("status", EarDetectionParams::class.java)
+                    binauralReady = isBinauralWear(ears)
+                    return
+                }
                 val mode = SpatialAudioMode.fromWire(intent.getStringExtra("mode"))
                 if (mode != selected) return
                 pending = null
@@ -103,7 +117,10 @@ fun SpatialAudioPage(isActive: Boolean) {
         context.registerReceiver(receiver, IntentFilter().apply {
             addAction(HyperPodsAction.ACTION_SPATIAL_AUDIO_STATE)
             addAction(HyperPodsAction.ACTION_SPATIAL_AUDIO_TRACKING_STATE)
+            addAction(HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED)
         }, Context.RECEIVER_EXPORTED)
+        HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_PODS_UI_INIT),
+            HyperPodsBroadcasts.BLUETOOTH)
         onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
 
@@ -118,7 +135,9 @@ fun SpatialAudioPage(isActive: Boolean) {
             Column {
                 SpatialAudioMode.entries.forEachIndexed { index, mode ->
                     if (index > 0) DashboardDivider(Modifier.padding(start = 64.dp, end = 16.dp))
-                    Row(Modifier.fillMaxWidth().clickable { apply(mode) }
+                    val canSelect = mode == SpatialAudioMode.OFF || binauralReady
+                    Row(Modifier.fillMaxWidth().clickable(enabled = canSelect) { apply(mode) }
+                        .alpha(if (canSelect) 1f else .45f)
                         .padding(horizontal = 18.dp, vertical = 15.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -137,9 +156,14 @@ fun SpatialAudioPage(isActive: Boolean) {
                 }
             }
         }
+        if (!binauralReady) Text(stringResource(R.string.spatial_audio_binaural_required), fontSize = 13.sp,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            modifier = Modifier.padding(horizontal = 8.dp))
         if (pending != null) Text(stringResource(R.string.spatial_audio_applying), fontSize = 13.sp,
             color = MiuixTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 8.dp))
-        status.error?.let { error ->
+        status.error?.let { rawError ->
+            val error = if (rawError == SPATIAL_AUDIO_BINAURAL_ERROR)
+                stringResource(R.string.spatial_audio_binaural_required) else rawError
             val rootPermissionError = error.contains("Permission denied", ignoreCase = true) ||
                 error.contains("Cannot run program \"su\"", ignoreCase = true) ||
                 error.contains("root permission", ignoreCase = true)

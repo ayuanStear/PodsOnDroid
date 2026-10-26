@@ -19,6 +19,8 @@ import moe.chenxy.hyperpods.ui.AppTheme
 import moe.chenxy.hyperpods.ui.components.*
 import moe.chenxy.hyperpods.utils.*
 import moe.chenxy.hyperpods.utils.data.*
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
+import moe.chenxy.hyperpods.utils.spatial.isBinauralWear
 import java.util.function.Consumer
 
 class HeadphonePanelActivity : ComponentActivity() {
@@ -82,12 +84,20 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
     var values by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var hostPending by remember { mutableStateOf(false) }
     var modeState by remember { mutableStateOf(PanelModeState()) }
+    var spatialMode by remember { mutableStateOf(AppPreferences.read(activity).spatialAudioMode) }
+    var binauralReady by remember { mutableStateOf(false) }
     var request by remember { mutableIntStateOf(0) }
     DisposableEffect(activity) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 if (!HyperPodsBroadcasts.isTrusted(context, this, HyperPodsBroadcasts.BLUETOOTH)) return
                 when (intent.action) {
+                    HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED -> {
+                        val ears = intent.getParcelableExtra("status", EarDetectionParams::class.java)
+                        binauralReady = isBinauralWear(ears)
+                    }
+                    HyperPodsAction.ACTION_SPATIAL_AUDIO_STATE ->
+                        spatialMode = SpatialAudioMode.fromWire(intent.getStringExtra("mode"))
                     HyperPodsAction.ACTION_PODS_CONNECTED -> {
                         info = intent.getParcelableExtra("device_info", AACPManager.Companion.AirPodsInformation::class.java)
                         name = intent.getStringExtra("device_name")
@@ -118,6 +128,8 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
         activity.registerReceiver(receiver, IntentFilter().apply {
             listOf(HyperPodsAction.ACTION_PODS_CONNECTED, HyperPodsAction.ACTION_PODS_DISCONNECTED,
                 HyperPodsAction.ACTION_PODS_BATTERY_CHANGED,
+                HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED,
+                HyperPodsAction.ACTION_SPATIAL_AUDIO_STATE,
                 HyperPodsAction.ACTION_PODS_DIAGNOSTICS, HyperPodsAction.ACTION_PODS_SETTINGS_STATE,
                 HyperPodsAction.ACTION_PODS_SETTING_RESULT).forEach(::addAction)
         }, Context.RECEIVER_EXPORTED)
@@ -141,6 +153,8 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
         hostPending = hostPending,
         allowedModes = if (PodsSettings.supports(PodsSettings.NOISE_MODE, model))
             PodsSettings.allowedNoiseModes(model, values) else emptySet(),
+        spatialMode = spatialMode,
+        spatialAvailable = binauralReady,
         maxHeightDp = maxHeightDp,
         connected = info != null,
         onMode = { mode ->
@@ -148,6 +162,10 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
             request++
             HyperPodsBroadcasts.send(activity, Intent(HyperPodsAction.ACTION_ANC_SELECT)
                 .putExtra("status", mode), HyperPodsBroadcasts.BLUETOOTH)
+        },
+        onSpatial = {
+            activity.startActivity(Intent(activity, SpatialAudioActivity::class.java))
+            activity.finish()
         },
         onMore = {
             activity.startActivity(Intent(activity, MainActivity::class.java)
