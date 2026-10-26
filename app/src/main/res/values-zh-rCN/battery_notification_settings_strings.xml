@@ -1,0 +1,14 @@
+<resources>
+    <string name="battery_notifications_title">电量通知</string>
+    <string name="battery_notifications_summary">电量通知只在超级岛显示，连接耳机时显示 5 秒。以下设置只保存在手机上，不会修改耳机。即使关闭提醒，电量分界值仍决定左右耳各自的显示颜色。</string>
+    <string name="battery_notifications_low_threshold" formatted="false">低电量分界值（%）</string>
+    <string name="battery_notifications_medium_threshold" formatted="false">中电量分界值（%）</string>
+    <string name="battery_notifications_threshold_hint">请输入 1 至 99 的整数，低电量值必须小于中电量值。低于低电量值显示红色，两者之间（含边界）显示黄色，高于中电量值显示绿色。开关立即保存；输入框结束编辑或退出页面时自动保存。</string>
+    <string name="battery_notifications_low_reminder">低电量提醒</string>
+    <string name="battery_notifications_low_reminder_summary">任一耳电量降至低电量值时提醒，每次连接中每只耳机最多一次。刚连接时已经低电量不会提醒。</string>
+    <string name="battery_notifications_medium_reminder">中电量提醒</string>
+    <string name="battery_notifications_medium_reminder_summary">任一耳电量降至中电量值时提醒，每次连接中每只耳机最多一次。此开关与低电量提醒互不影响。</string>
+    <string name="battery_notifications_invalid">未保存：请输入 1 至 99 的整数，低电量值必须小于中电量值。仍使用上次保存的电量值。</string>
+    <string name="battery_notifications_migration_notice" formatted="false">旧版电量设置需要更新，目前暂用低电量 20%、中电量 50%，原设置仍保留以供恢复。请检查数值，结束编辑或退出页面后自动确认。</string>
+    <string name="battery_notifications_save_failed">无法在此手机上保存电量通知设置。已保存的设置保持不变，请重试。</string>
+</resources>

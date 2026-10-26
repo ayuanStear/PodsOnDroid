@@ -1,0 +1,29 @@
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_group_app">App settings</string>
+    <string name="settings_group_support">Support &amp; information</string>
+    <string name="settings_group_diagnostics">Diagnostics &amp; maintenance</string>
+    <string name="settings_group_tests">Testing tools</string>
+    <string name="settings_tools">Advanced &amp; diagnostics</string>
+    <string name="settings_modules">Module &amp; scope reload</string>
+    <string name="settings_lid_observation">Case observation</string>
+    <string name="settings_notifications_summary">Battery display and reminders in the Super Island</string>
+    <string name="settings_appearance_summary">Navigation transparency and readability</string>
+    <string name="settings_about_summary">About the app, source code and licenses</string>
+    <string name="settings_tools_summary">Connection reports, scope reload and testing tools</string>
+    <string name="settings_connection_summary">Check the connection and share a diagnostic report</string>
+    <string name="settings_modules_summary">Check module versions and reload them if needed</string>
+    <string name="settings_lid_summary">Check whether opening the case can be detected</string>
+    <string name="settings_tools_notice">These tools are optional. Opening this menu does not restart processes or begin a headset test.</string>
+    <string name="about_project_description" translatable="false">Please Open Door, Siri.</string>
+    <string name="about_project_maintainer">Maintained by HXLH50K</string>
+    <string name="about_sources">Sources and acknowledgements</string>
+    <string name="about_sources_description">Based on HyperPods. Thanks to Art_Chen, Mo-SeTian and the projects below.</string>
+    <string name="about_upstream_source">HyperPods · Art-Chen (original)</string>
+    <string name="about_hyperpods_fork">HyperPods · Mo-SeTian (fork)</string>
+    <string name="about_librepods">LibrePods · protocol and controls</string>
+    <string name="about_openpods">OpenPods · battery broadcast reference</string>
+    <string name="about_licenses">Open-source notices</string>
+    <string name="about_license_description">The GPLv3 license and source-file notices are retained, including AGPLv3 notices in AACP files. See the license and source files for details.</string>
+    <string name="about_view_license">View project license</string>
+</resources>

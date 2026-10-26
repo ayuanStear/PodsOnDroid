@@ -1,0 +1,26 @@
+<resources>
+    <string name="lid_observation_title">Case opening test (experimental)</string>
+    <string name="lid_observation_summary">Scan nearby Bluetooth broadcasts for 30 seconds to check AirPods 5 case opening and closing. This does not enable a connection popup.</string>
+    <string name="lid_observation_instructions">Start with the case closed. Mark it closed, open it and mark it open, then close and mark again. Wait a few seconds between actions. Do not reset, unpair, or change firmware.</string>
+    <string name="lid_observation_privacy">This test needs nearby-device permission. Scan results may not be your headphones. Reports exclude device addresses, names, keys and raw broadcasts. Data is not saved to a file; copy it before leaving. Closing this panel or backgrounding the app stops scanning. Android may hide some broadcasts, so no results do not mean your headphones are incompatible.</string>
+    <string name="lid_observation_counts">%1$d s · %2$d samples · %3$d candidates · %4$d malformed · %5$d dropped</string>
+    <string name="lid_observation_phase">Last manual marker</string>
+    <string name="lid_observation_unmarked">Not marked</string>
+    <string name="lid_observation_closed">Case closed (user marked)</string>
+    <string name="lid_observation_open">Case open (user marked)</string>
+    <string name="lid_observation_start">Start 30-second observation</string>
+    <string name="lid_observation_mark_closed">Mark: case is closed</string>
+    <string name="lid_observation_mark_open">Mark: case is open</string>
+    <string name="lid_observation_stop">Stop observation</string>
+    <string name="lid_observation_copy">Copy redacted observation report</string>
+    <string name="lid_observation_idle">Not started</string>
+    <string name="lid_observation_running">Observing nearby advertisements</string>
+    <string name="lid_observation_complete">Observation window completed</string>
+    <string name="lid_observation_stopped">Observation stopped</string>
+    <string name="lid_observation_permission">Nearby-device permission not granted</string>
+    <string name="lid_observation_bluetooth_off">Bluetooth is off; no scan started</string>
+    <string name="lid_observation_unavailable">BLE scanner is unavailable</string>
+    <string name="lid_observation_failed">Scan failed or cleanup could not be confirmed</string>
+    <string name="lid_observation_scan_error">Android scan error: %1$d</string>
+    <string name="lid_observation_clipboard_failed">Could not access the clipboard.</string>
+</resources>

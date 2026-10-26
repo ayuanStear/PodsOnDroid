@@ -1,0 +1,35 @@
+<resources>
+    <string name="chime_volume_reported">耳机回报的提示音音量为 %1$d%%，已更新显示。</string>
+    <string name="chime_volume_range">音量范围%1$d%%~%2$d%%，过低的值可能不被耳机接受。</string>
+    <string name="chime_volume_below_threshold">低于 %1$d%% 的提示音音量可能不被耳机接受，并恢复为之前的音量。</string>
+    <string name="unfinished_features_title">强行使用未实现功能（调试）</string>
+    <string name="unfinished_features_warning">默认关闭。开启后可点击滑动调音量间隔和语音助手等未完成功能，仅供调试。语音助手仍未实现，点击只会显示提示。打开此开关不会修改耳机设置。</string>
+    <string name="unfinished_feature_disabled">暂未实现。如需强行尝试，请在设置 → 高级与诊断中开启调试开关。</string>
+    <string name="head_test_airpods5">采集方式：AirPods 5 专用</string>
+    <string name="long_press_autosave">至少选两种模式，返回或点击弹窗外部时自动保存。</string>
+    <string name="long_press_select_two">请至少选择两种可用模式后再退出。</string>
+    <string name="long_press_unavailable">控制尚未就绪，当前选择未发送。</string>
+    <string name="long_press_unread">未读取</string>
+    <string name="long_press_waiting">等待中</string>
+    <string name="voice_assist_unavailable">此版本尚未实现语音助手，未修改耳机设置。</string>
+    <string name="head_reply_short">最近拒绝的回复不足以容纳当前支持的传感器布局，不会被当作姿态数据。</string>
+    <string name="head_reply_envelope">最近拒绝的回复使用了不同的传感器封装。</string>
+    <string name="head_reply_marker">最近拒绝的回复中，第 10–11 字节封装字段尚不支持。</string>
+    <string name="head_reply_decode">最近回复无法解析为传感器采样。</string>
+    <string name="head_reply_header">最近拒绝回复：%1$d 字节\n仅前 12 字节：%2$s</string>
+    <string name="swipe_protocol_title">滑动间隔协议证据</string>
+    <string name="swipe_protocol_summary">本次连接最近请求：%1$s\n最近 0x23 回复：%2$s\n请求值不等于耳机已确认值。</string>
+    <string name="control_raw_reply">载荷 %1$d 字节；前四字节：%2$s</string>
+    <string name="swipe_reply_missing">尚未记录到回复</string>
+    <string name="ownership_experiment_request">申请本机控制权一次（DEBUG）</string>
+    <string name="ownership_experiment_reload">请先完整重启 DEBUG 作用域，蓝牙宿主尚未回报对本实验的支持。</string>
+    <string name="ownership_experiment_warning">仅发送一次申请，可能影响其他设备。不会自动重试或切换音频。相关协议证据最多采集 10 秒。</string>
+    <string name="ownership_experiment_status">最近一次控制权实验</string>
+    <string name="ownership_experiment_idle">本次连接尚未申请</string>
+    <string name="ownership_experiment_pending">申请已进入发送队列，等待耳机实际回报控制权</string>
+    <string name="ownership_experiment_confirmed">耳机回报本连接已拥有控制权</string>
+    <string name="ownership_experiment_not_granted">耳机回报本连接未拥有控制权</string>
+    <string name="ownership_experiment_timeout">3 秒内未确认控制权，未发送重试</string>
+    <string name="protocol_evidence_title">有限协议证据（DEBUG）</string>
+    <string name="protocol_evidence_empty">手动申请控制权、姿态测试或修改滑动间隔会开启最多 10 秒、64 条记录的采集。进入发送队列不等于耳机确认。不会采集完整传感器流。</string>
+</resources>

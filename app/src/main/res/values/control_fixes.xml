@@ -1,0 +1,35 @@
+<resources>
+    <string name="chime_volume_reported">Headphones reported %1$d%%. The tone volume has been updated.</string>
+    <string name="chime_volume_range">Volume range: %1$d%%~%2$d%%. Very low values may not be accepted by the headphones.</string>
+    <string name="chime_volume_below_threshold">The headphones may reject tone volume below %1$d%% and return to the previous level.</string>
+    <string name="unfinished_features_title">Force unfinished features (debug)</string>
+    <string name="unfinished_features_warning">Off by default. Unlocks the unfinished swipe interval and voice assistant controls for debugging. The assistant is still unavailable and only shows a notice. Turning this on does not change your headphones.</string>
+    <string name="unfinished_feature_disabled">Not yet implemented. To try it anyway, enable the debug override in Settings → Advanced &amp; diagnostics.</string>
+    <string name="head_test_airpods5">Motion capture: AirPods 5</string>
+    <string name="long_press_autosave">Choose at least two modes. Changes save when you go back or tap outside.</string>
+    <string name="long_press_select_two">Choose at least two available modes before leaving.</string>
+    <string name="long_press_unavailable">The control is not ready. Your selection has not been sent.</string>
+    <string name="long_press_unread">Not read</string>
+    <string name="long_press_waiting">Waiting</string>
+    <string name="voice_assist_unavailable">Voice assistant is not implemented in this version. No headphone settings were changed.</string>
+    <string name="head_reply_short">The last rejected reply is too short for the supported sensor layout; it is not treated as motion.</string>
+    <string name="head_reply_envelope">The last rejected reply uses a different sensor envelope.</string>
+    <string name="head_reply_marker">The last rejected reply has an unsupported envelope field at bytes 10–11.</string>
+    <string name="head_reply_decode">The last reply could not be decoded as a sensor sample.</string>
+    <string name="head_reply_header">Rejected reply length (bytes): %1$d\nFirst 12 bytes only: %2$s</string>
+    <string name="swipe_protocol_title">Swipe interval protocol evidence</string>
+    <string name="swipe_protocol_summary">Last request in this connection: %1$s\nLast 0x23 reply: %2$s\nA request is not a confirmed headphone value.</string>
+    <string name="control_raw_reply">Payload length (bytes): %1$d; first four: %2$s</string>
+    <string name="swipe_reply_missing">No reply recorded</string>
+    <string name="ownership_experiment_request">Request local control once (DEBUG)</string>
+    <string name="ownership_experiment_reload">Reload the full DEBUG scopes first; the Bluetooth host has not reported support for this experiment.</string>
+    <string name="ownership_experiment_warning">Sends one ownership request. May affect other devices. No automatic retry or audio transfer. Related protocol evidence is captured for up to 10 seconds.</string>
+    <string name="ownership_experiment_status">Last ownership experiment</string>
+    <string name="ownership_experiment_idle">No request made in this connection</string>
+    <string name="ownership_experiment_pending">Request queued; waiting for a real ownership report</string>
+    <string name="ownership_experiment_confirmed">The headphones report that this connection owns control</string>
+    <string name="ownership_experiment_not_granted">The headphones report that this connection does not own control</string>
+    <string name="ownership_experiment_timeout">No ownership confirmation within 3 seconds; no retry was sent</string>
+    <string name="protocol_evidence_title">Limited protocol evidence (DEBUG)</string>
+    <string name="protocol_evidence_empty">An explicit ownership request, pose test or swipe-interval change opens a 10-second / 64-record window. Queued writes are not headphone confirmations. No full sensor stream is captured.</string>
+</resources>

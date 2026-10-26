@@ -1,0 +1,26 @@
+<resources>
+    <string name="lid_observation_title">开盖检测（实验）</string>
+    <string name="lid_observation_summary">扫描 30 秒附近的蓝牙广播，测试能否识别 AirPods 5 开合盖。此测试不会开启连接弹窗。</string>
+    <string name="lid_observation_instructions">先合上耳机盒。开始后标记“已合盖”，开盖并标记“已开盖”，再合盖并标记。每次操作间隔几秒。不需要重置、取消配对或更改固件。</string>
+    <string name="lid_observation_privacy">此测试需要附近设备权限。扫描结果不一定是你的耳机。报告不包含设备地址、名称、密钥或原始广播内容。数据不会保存到文件，请离开前复制。关闭面板或切到后台会停止扫描。系统可能隐藏部分广播，未扫到数据不代表耳机不兼容。</string>
+    <string name="lid_observation_counts">%1$d 秒 · %2$d 个样本 · %3$d 个候选 · %4$d 个格式错误 · %5$d 个丢弃</string>
+    <string name="lid_observation_phase">最近手动标记</string>
+    <string name="lid_observation_unmarked">尚未标记</string>
+    <string name="lid_observation_closed">耳机盒已合盖（用户标记）</string>
+    <string name="lid_observation_open">耳机盒已开盖（用户标记）</string>
+    <string name="lid_observation_start">开始 30 秒观察</string>
+    <string name="lid_observation_mark_closed">标记：已合盖</string>
+    <string name="lid_observation_mark_open">标记：已开盖</string>
+    <string name="lid_observation_stop">停止观察</string>
+    <string name="lid_observation_copy">复制脱敏观察报告</string>
+    <string name="lid_observation_idle">尚未开始</string>
+    <string name="lid_observation_running">正在观察附近广播</string>
+    <string name="lid_observation_complete">观察时间已结束</string>
+    <string name="lid_observation_stopped">观察已停止</string>
+    <string name="lid_observation_permission">未获得附近设备权限</string>
+    <string name="lid_observation_bluetooth_off">蓝牙未开启，未开始扫描</string>
+    <string name="lid_observation_unavailable">BLE 扫描器不可用</string>
+    <string name="lid_observation_failed">扫描失败或无法确认清理结果</string>
+    <string name="lid_observation_scan_error">Android 扫描错误：%1$d</string>
+    <string name="lid_observation_clipboard_failed">无法访问剪贴板。</string>
+</resources>
