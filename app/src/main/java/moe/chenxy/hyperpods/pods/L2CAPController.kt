@@ -49,11 +49,7 @@ import moe.chenxy.hyperpods.utils.HyperPodsBroadcasts
 import moe.chenxy.hyperpods.utils.SystemApisUtils
 import moe.chenxy.hyperpods.utils.SinglePodAnc
 import moe.chenxy.hyperpods.utils.SystemIntegrations
-import moe.chenxy.hyperpods.utils.spatial.RootHeadTrackerBridge
-import moe.chenxy.hyperpods.utils.spatial.RootSpatialAudioController
 import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
-import moe.chenxy.hyperpods.utils.spatial.SpatialAudioRootState
-import moe.chenxy.hyperpods.utils.spatial.SpatialHeadPoseProcessor
 import moe.chenxy.hyperpods.utils.data.BatteryParams
 import moe.chenxy.hyperpods.utils.data.EarDetectionParams
 import moe.chenxy.hyperpods.utils.data.HyperPodsAction
@@ -153,8 +149,6 @@ object L2CAPController {
     private var requestedSpatialAudioMode = SpatialAudioMode.OFF
     private var spatialApplyJob: Job? = null
     private var spatialTrackingActive = false
-    private val spatialPoseProcessor = SpatialHeadPoseProcessor()
-    private val rootHeadTracker = RootHeadTrackerBridge()
     private var headGestureCalls: HeadGestureCalls? = null
     private val headTrackingStream = HeadTrackingStream(
         sendStandard = { start -> sendHeadTrackingCommand(start, HeadTrackingStream.Variant.STANDARD) },
@@ -243,8 +237,6 @@ object L2CAPController {
     private fun clearHeadTracking() {
         headPreview.stop("disconnected")
         spatialTrackingActive = false
-        rootHeadTracker.stop()
-        spatialPoseProcessor.reset()
         headGestureCalls?.close()
         headGestureCalls = null
         headTrackingStream.reset()
@@ -257,16 +249,11 @@ object L2CAPController {
 
     @Synchronized
     private fun stopSpatialTracking(reason: String) {
-        if (!spatialTrackingActive && !headTrackingStream.isOwnedBy(HeadTrackingStream.Owner.SPATIAL)) {
-            rootHeadTracker.stop()
-            spatialPoseProcessor.reset()
-            return
-        }
+        if (!spatialTrackingActive && !headTrackingStream.isOwnedBy(HeadTrackingStream.Owner.SPATIAL)) return
         spatialTrackingActive = false
         headTrackingStream.release(HeadTrackingStream.Owner.SPATIAL)
-        rootHeadTracker.stop()
-        spatialPoseProcessor.reset()
         Log.i(TAG, "Spatial head tracking stopped: $reason")
+        broadcastSpatialTrackingState(false, null)
     }
 
     private fun scheduleSpatialAudioApply(delayMs: Long = 0) {
@@ -278,82 +265,45 @@ object L2CAPController {
     }
 
     private suspend fun applySpatialAudioMode() {
-        val mode: SpatialAudioMode
-        val context: Context
-        val manager: AACPManager?
-        val address: String?
-        synchronized(this@L2CAPController) {
-            mode = requestedSpatialAudioMode
-            context = mContext ?: run {
-                broadcastSpatialAudioFailure(mode, "Connect the AirPods first")
-                return
-            }
-            manager = aacpManager
-            address = if (::mDevice.isInitialized) mDevice.address else null
-        }
-        val apkPath = try {
-            context.packageManager.getApplicationInfo(BuildConfig.APPLICATION_ID, 0).sourceDir
-        } catch (error: Exception) {
-            broadcastSpatialAudioFailure(mode, "PodsOnDroid APK is unavailable: ${error.message}")
-            return
-        }
-        val rootSpatial = RootSpatialAudioController(apkPath)
+        val mode = synchronized(this@L2CAPController) { requestedSpatialAudioMode }
         if (mode == SpatialAudioMode.HEAD_TRACKED) {
-            if (!headTrackingReady() || manager == null || address.isNullOrBlank()) {
-                broadcastSpatialAudioFailure(mode, "Wait for headset status synchronization, then retry")
+            if (!headTrackingReady()) {
+                broadcastSpatialTrackingState(false, "Wait for headset status synchronization, then retry")
                 return
             }
-            if (!rootHeadTracker.start(context, address)) {
-                broadcastSpatialAudioFailure(mode, "Unable to start the root UHID head tracker")
-                return
-            }
+            synchronized(this@L2CAPController) { aacpManager?.let(::ensureControlOwnership) }
             val acquired = synchronized(this@L2CAPController) {
                 headTrackingStream.acquire(HeadTrackingStream.Owner.SPATIAL) {
                     stopSpatialTracking("interrupted")
                 }.also { if (it) spatialTrackingActive = true }
             }
             if (!acquired) {
-                rootHeadTracker.stop()
-                broadcastSpatialAudioFailure(mode, "The headset motion stream is busy")
+                broadcastSpatialTrackingState(false, "The headset motion stream is busy")
                 return
             }
-            spatialPoseProcessor.reset()
         } else {
             stopSpatialTracking("mode_${mode.wireValue}")
         }
-        val state = rootSpatial.setMode(mode)
-        broadcastSpatialAudioState(mode, state)
-        if (mode == SpatialAudioMode.HEAD_TRACKED && !state.supported) {
-            stopSpatialTracking("spatializer_unavailable")
-        }
+        broadcastSpatialTrackingState(spatialTrackingActive, null)
     }
 
-    private fun broadcastSpatialAudioFailure(mode: SpatialAudioMode, error: String) {
-        broadcastSpatialAudioState(mode, SpatialAudioRootState(
-            helperAvailable = false, spatializerAvailable = false, error = error
-        ))
-    }
-
-    private fun broadcastSpatialAudioState(mode: SpatialAudioMode,
-        state: SpatialAudioRootState) {
-        HyperPodsBroadcasts.send(mContext, Intent(HyperPodsAction.ACTION_SPATIAL_AUDIO_STATE).apply {
-            putExtra("mode", mode.wireValue)
-            putExtra("supported", state.supported)
-            putExtra("helper_available", state.helperAvailable)
-            putExtra("enabled", state.spatializerEnabled)
-            putExtra("desired", state.desiredMode)
-            putExtra("actual", state.actualMode)
-            putExtra("error", state.error)
+    private fun broadcastSpatialTrackingState(active: Boolean, error: String?) {
+        HyperPodsBroadcasts.send(mContext, Intent(HyperPodsAction.ACTION_SPATIAL_AUDIO_TRACKING_STATE).apply {
+            putExtra("mode", requestedSpatialAudioMode.wireValue)
+            putExtra("tracking_active", active)
+            putExtra("error", error)
         })
     }
 
+    /** The app process owns root/UHID; Bluetooth only forwards raw quaternion components. */
     private fun feedSpatialPose(packet: ByteArray) {
         if (!spatialTrackingActive || packet.size < 55) return
-        val sample = spatialPoseProcessor.processRawComponents(
-            littleEndianShort(packet, 43), littleEndianShort(packet, 45),
-            littleEndianShort(packet, 47), System.nanoTime()
-        ) ?: return
-        rootHeadTracker.submit(sample.pose)
+        HyperPodsBroadcasts.send(mContext, Intent(HyperPodsAction.ACTION_SPATIAL_AUDIO_POSE).apply {
+            putExtra("x", littleEndianShort(packet, 43))
+            putExtra("y", littleEndianShort(packet, 45))
+            putExtra("z", littleEndianShort(packet, 47))
+            putExtra("at", SystemClock.elapsedRealtimeNanos())
+        })
     }
 
     private fun littleEndianShort(data: ByteArray, offset: Int): Int =
@@ -449,9 +399,12 @@ object L2CAPController {
                 }
                 return
             }
-            val sender = if (intent.action == HyperPodsAction.ACTION_GET_PODS_MAC)
-                HyperPodsBroadcasts.SYSTEM_UI else BuildConfig.APPLICATION_ID
-            if (!HyperPodsBroadcasts.isTrusted(context, this, sender)) return
+            val sender = if (intent.action == HyperPodsAction.ACTION_GET_PODS_MAC) {
+                listOf(HyperPodsBroadcasts.SYSTEM_UI, BuildConfig.APPLICATION_ID)
+                    .firstOrNull { HyperPodsBroadcasts.isTrusted(context, this, it) } ?: return
+            } else BuildConfig.APPLICATION_ID.takeIf {
+                HyperPodsBroadcasts.isTrusted(context, this, it)
+            } ?: return
             if (intent.action == HyperPodsAction.ACTION_GET_PODS_MAC) {
                 if (mContext == null || aacpManager == null) return
                 Intent(HyperPodsAction.ACTION_PODS_MAC_RECEIVED).apply {
@@ -459,7 +412,7 @@ object L2CAPController {
                     this.putExtra("model_number", currentPodsInfo?.modelNumber)
                     this.putExtra("request_id", intent.getStringExtra("request_id"))
                     this.addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
-                    HyperPodsBroadcasts.send(context, this, HyperPodsBroadcasts.SYSTEM_UI)
+                    HyperPodsBroadcasts.send(context, this, sender)
                     return
                 }
             }

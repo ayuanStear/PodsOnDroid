@@ -31,4 +31,6 @@ object HyperPodsAction {
     const val ACTION_PODS_STATUS_CHANGED = "com.hxlh50k.pods.action.pods_status_changed"
     const val ACTION_SPATIAL_AUDIO_APPLY = "com.hxlh50k.pods.action.spatial_audio_apply"
     const val ACTION_SPATIAL_AUDIO_STATE = "com.hxlh50k.pods.action.spatial_audio_state"
+    const val ACTION_SPATIAL_AUDIO_TRACKING_STATE = "com.hxlh50k.pods.action.spatial_audio_tracking_state"
+    const val ACTION_SPATIAL_AUDIO_POSE = "com.hxlh50k.pods.action.spatial_audio_pose"
 }

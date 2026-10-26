@@ -28,11 +28,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import moe.chenxy.hyperpods.BuildConfig
 import moe.chenxy.hyperpods.R
 import moe.chenxy.hyperpods.utils.AppPreferences
 import moe.chenxy.hyperpods.utils.HyperPodsBroadcasts
 import moe.chenxy.hyperpods.utils.data.HyperPodsAction
 import moe.chenxy.hyperpods.utils.spatial.SpatialAudioMode
+import moe.chenxy.hyperpods.utils.spatial.SpatialAudioRuntime
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import moe.chenxy.hyperpods.ui.components.DashboardGroup as Card
@@ -71,17 +73,23 @@ fun SpatialAudioPage(isActive: Boolean) {
         selected = mode
         pending = mode
         status = SpatialUiState()
-        HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_SPATIAL_AUDIO_APPLY)
-            .putExtra("mode", mode.wireValue), HyperPodsBroadcasts.BLUETOOTH)
+        SpatialAudioRuntime.setMode(mode)
     }
 
     DisposableEffect(context) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(receiverContext: Context, intent: Intent) {
-                if (!HyperPodsBroadcasts.isTrusted(receiverContext, this, HyperPodsBroadcasts.BLUETOOTH)) return
+                val trusted = HyperPodsBroadcasts.isTrusted(receiverContext, this,
+                    HyperPodsBroadcasts.BLUETOOTH) ||
+                    HyperPodsBroadcasts.isTrusted(receiverContext, this, BuildConfig.APPLICATION_ID)
+                if (!trusted) return
                 val mode = SpatialAudioMode.fromWire(intent.getStringExtra("mode"))
                 if (mode != selected) return
                 pending = null
+                if (intent.action == HyperPodsAction.ACTION_SPATIAL_AUDIO_TRACKING_STATE) {
+                    intent.getStringExtra("error")?.let { error -> status = status.copy(error = error) }
+                    return
+                }
                 status = SpatialUiState(
                     supported = intent.getBooleanExtra("supported", false),
                     helperAvailable = intent.getBooleanExtra("helper_available", false),
@@ -91,14 +99,15 @@ fun SpatialAudioPage(isActive: Boolean) {
                 )
             }
         }
-        context.registerReceiver(receiver, IntentFilter(HyperPodsAction.ACTION_SPATIAL_AUDIO_STATE),
-            Context.RECEIVER_EXPORTED)
+        context.registerReceiver(receiver, IntentFilter().apply {
+            addAction(HyperPodsAction.ACTION_SPATIAL_AUDIO_STATE)
+            addAction(HyperPodsAction.ACTION_SPATIAL_AUDIO_TRACKING_STATE)
+        }, Context.RECEIVER_EXPORTED)
         onDispose { runCatching { context.unregisterReceiver(receiver) } }
     }
 
     LaunchedEffect(isActive) {
-        if (isActive) HyperPodsBroadcasts.send(context, Intent(HyperPodsAction.ACTION_SPATIAL_AUDIO_APPLY)
-            .putExtra("mode", selected.wireValue), HyperPodsBroadcasts.BLUETOOTH)
+        if (isActive) SpatialAudioRuntime.setMode(selected)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {

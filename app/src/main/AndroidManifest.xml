@@ -8,6 +8,7 @@
         <package android:name="com.android.systemui" />
     </queries>
     <application
+        android:name=".PodsApplication"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:description="@string/module_description"
