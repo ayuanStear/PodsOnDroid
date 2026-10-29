@@ -40,6 +40,7 @@ import moe.chenxy.hyperpods.utils.Capability
 import moe.chenxy.hyperpods.utils.PodsSettings
 import moe.chenxy.hyperpods.utils.PodsIslandData
 import moe.chenxy.hyperpods.utils.AirPodsModels
+import moe.chenxy.hyperpods.utils.ConversationFade
 import moe.chenxy.hyperpods.utils.ConversationVolume
 import moe.chenxy.hyperpods.utils.DiagnosticsHistory
 import moe.chenxy.hyperpods.utils.DiagnosticEvents
@@ -107,6 +108,7 @@ object L2CAPController {
     private var pendingAudioRoute: MediaRoute2Info? = null
     private var routeRetryJob: Job? = null
     private var routeTransferTimeout: Job? = null
+    private var offModeJob: Job? = null
     private var routeRetryCount = 0
     private var pausedAudio = false
     private var lastTempBatt = 0
@@ -120,7 +122,6 @@ object L2CAPController {
     private data class PendingSetting(val value: Int, val timeout: Job)
     private val pendingSettings = mutableMapOf<String, PendingSetting>()
     private val failedSettings = mutableMapOf<String, Int>()
-    private var pendingOffSelection = false
     private var pendingRename: String? = null
     private var renameTimeout: Job? = null
     private var conversationTimeout: Job? = null
@@ -137,6 +138,8 @@ object L2CAPController {
     private var earDetection = true
     private var autoSwitchToSpeaker = true
     private var conversationPhoneVolume = true
+    private var conversationFadeInMs = ConversationFade.DEFAULT_IN_MS
+    private var conversationFadeOutMs = ConversationFade.DEFAULT_OUT_MS
     private var lowBatterySettings = LowBatterySettings()
     private var batteryNotificationSettings = BatteryNotificationSettings()
     private var headGestures = false
@@ -328,13 +331,19 @@ object L2CAPController {
                 }
                 return
             }
-            val sender = if (intent.action == HyperPodsAction.ACTION_GET_PODS_MAC)
-                HyperPodsBroadcasts.SYSTEM_UI else BuildConfig.APPLICATION_ID
-            if (!HyperPodsBroadcasts.isTrusted(context, this, sender)) return
+            val senders = when (intent.action) {
+                HyperPodsAction.ACTION_GET_PODS_MAC -> arrayOf(HyperPodsBroadcasts.SYSTEM_UI)
+                HyperPodsAction.ACTION_XIAOMI_STATE_REQUEST -> arrayOf(HyperPodsBroadcasts.XIAOMI_BLUETOOTH)
+                HyperPodsAction.ACTION_ANC_SELECT -> arrayOf(
+                    BuildConfig.APPLICATION_ID, HyperPodsBroadcasts.XIAOMI_BLUETOOTH)
+                else -> arrayOf(BuildConfig.APPLICATION_ID)
+            }
+            if (!HyperPodsBroadcasts.isTrusted(context, this, *senders)) return
             if (intent.action == HyperPodsAction.ACTION_GET_PODS_MAC) {
                 if (mContext == null || aacpManager == null) return
                 Intent(HyperPodsAction.ACTION_PODS_MAC_RECEIVED).apply {
                     this.putExtra("mac", mDevice.address)
+                    this.putExtra("device_name", mDevice.alias ?: mDevice.name)
                     this.putExtra("model_number", currentPodsInfo?.modelNumber)
                     this.putExtra("request_id", intent.getStringExtra("request_id"))
                     this.addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
@@ -347,15 +356,17 @@ object L2CAPController {
     }
 
     private fun changeUIAncStatus(status: Int) {
-        if (status !in 1..4) {
-            // ignore invalid param
-            return
-        }
+        if (status !in 1..4) return
         Intent(HyperPodsAction.ACTION_PODS_ANC_CHANGED).apply {
             this.putExtra("status", status)
             this.`package` = BuildConfig.APPLICATION_ID
             this.addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             HyperPodsBroadcasts.send(mContext, this)
+        }
+        Intent(HyperPodsAction.ACTION_PODS_ANC_CHANGED).apply {
+            putExtra("status", status)
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            HyperPodsBroadcasts.send(mContext, this, HyperPodsBroadcasts.XIAOMI_BLUETOOTH)
         }
     }
 
@@ -366,6 +377,11 @@ object L2CAPController {
             this.addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             HyperPodsBroadcasts.send(mContext, this)
         }
+        Intent(HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED).apply {
+            putExtra("status", status)
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            HyperPodsBroadcasts.send(mContext, this, HyperPodsBroadcasts.XIAOMI_BLUETOOTH)
+        }
     }
 
     private fun changeUIBatteryStatus(status: BatteryParams) {
@@ -375,6 +391,29 @@ object L2CAPController {
             this.addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             HyperPodsBroadcasts.send(mContext, this)
         }
+        sendBatteryState(status, HyperPodsBroadcasts.SYSTEM_UI)
+        sendBatteryState(status, HyperPodsBroadcasts.XIAOMI_BLUETOOTH)
+    }
+
+    /** Read-only projection into HyperOS native state consumers. */
+    private fun sendBatteryState(status: BatteryParams, target: String) {
+        if (mContext == null || !::mDevice.isInitialized) return
+        Intent(HyperPodsAction.ACTION_PODS_BATTERY_CHANGED).apply {
+            putExtra("status", status)
+            putExtra("address", mDevice.address)
+            putExtra("device_name", mDevice.alias ?: mDevice.name)
+            putExtra("model_number", currentPodsInfo?.modelNumber)
+            addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+            HyperPodsBroadcasts.send(mContext, this, target)
+        }
+    }
+
+    private fun sendXiaomiState() {
+        if (batteryStateValid && ::currentBatteryParams.isInitialized)
+            sendBatteryState(currentBatteryParams, HyperPodsBroadcasts.XIAOMI_BLUETOOTH)
+        if (earDetectionStateValid && ::currentEarDetectionParams.isInitialized)
+            changeUIInEarStatus(currentEarDetectionParams)
+        if (currentAnc in 1..4) changeUIAncStatus(currentAnc)
     }
 
     @Synchronized
@@ -428,6 +467,7 @@ object L2CAPController {
                 sendConnectedStatus()
                 sendDiagnostics(force = true)
             }
+            HyperPodsAction.ACTION_XIAOMI_STATE_REQUEST -> sendXiaomiState()
             HyperPodsAction.ACTION_PODS_STATUS_RETRY -> {
                 if (aacpManager != null && initialStatusReady()) {
                     initialStatusRetries++
@@ -508,6 +548,10 @@ object L2CAPController {
             putExtra("device_name", mDevice.alias ?: mDevice.name)
             HyperPodsBroadcasts.send(mContext, this)
         }
+        val status = if (batteryStateValid && ::currentBatteryParams.isInitialized)
+            currentBatteryParams else BatteryParams()
+        sendBatteryState(status, HyperPodsBroadcasts.SYSTEM_UI)
+        sendBatteryState(status, HyperPodsBroadcasts.XIAOMI_BLUETOOTH)
         sendSettingsState()
     }
 
@@ -520,8 +564,7 @@ object L2CAPController {
 
     private fun sendSettingsState(force: Boolean = false) {
         val values = confirmedSettings()
-        val pending = (pendingSettings.keys + listOfNotNull(pendingRename?.let { PodsSettings.RENAME },
-            PodsSettings.NOISE_MODE.takeIf { pendingOffSelection })).toSet()
+        val pending = (pendingSettings.keys + listOfNotNull(pendingRename?.let { PodsSettings.RENAME })).toSet()
         val unconfirmed = PodsSettings.identifiers.filterValues { aacpManager?.isAwaitingReport(it) == true }.keys.toSet()
         val state = Triple(values, pending, unconfirmed)
         if (!force && lastSettingsState == state) {
@@ -649,7 +692,6 @@ object L2CAPController {
     private fun sendSettingResult(key: String, success: Boolean, pending: Boolean = false,
         status: String = if (pending) "sent" else if (success) "confirmed" else "timeout") {
         if (key == PodsSettings.NOISE_MODE && !success && !pending) singlePodAnc.requestFailed()
-        val continueOff = key == HyperPodsPrefsKey.ALLOW_OFF_OPTION && pendingOffSelection && !pending
         lastSettingKey = key
         lastSettingStatus = status
         recordEvent("setting", status, key)
@@ -663,12 +705,6 @@ object L2CAPController {
         sendSettingsState()
         if (status == "write_failed" || status == "timeout")
             recordFailure(diagnosticsSnapshot(), if (status == "write_failed") "setting_write_failed" else "setting_timeout")
-        // Publish the prerequisite first, so the following mode command remains the latest operation.
-        if (continueOff) {
-            pendingOffSelection = false
-            if (success) sendSetting(PodsSettings.NOISE_MODE, 1)
-            else sendSettingResult(PodsSettings.NOISE_MODE, false, status = status)
-        }
     }
 
     @Synchronized
@@ -1082,6 +1118,12 @@ object L2CAPController {
             updateEarDetectionSettings(settings.earDetection, settings.switchSpeaker)
         if (conversationPhoneVolume != settings.conversationVolume)
             updateConversationPhoneVolume(settings.conversationVolume)
+        if (conversationFadeInMs != settings.conversationFadeInMs ||
+            conversationFadeOutMs != settings.conversationFadeOutMs) {
+            conversationFadeInMs = ConversationFade.normalize(settings.conversationFadeInMs)
+            conversationFadeOutMs = ConversationFade.normalize(settings.conversationFadeOutMs)
+            conversationVolume.setFadeDurations(conversationFadeInMs, conversationFadeOutMs)
+        }
         val remindersChanged = batteryNotificationSettings != settings.batteryNotifications
         lowBatterySettings = settings.lowBattery
         batteryNotificationSettings = settings.batteryNotifications
@@ -1186,8 +1228,9 @@ object L2CAPController {
                 conversationRestoreJob?.cancel()
                 conversationRestoreJob = null
             } else if (conversationRouteId == null) return
-            runCatching { conversationVolume.onStatus(status, smoothRestore = true) }
+            val fading = runCatching { conversationVolume.onStatus(status, smoothRestore = true) }
                 .onFailure { Log.w(TAG, "Unable to adjust conversation volume") }
+                .getOrDefault(false)
             conversationTimeout?.cancel()
             if (status in 1..3) {
                 val generation = sessionId
@@ -1198,7 +1241,8 @@ object L2CAPController {
                         if (sessionId == generation) resetConversationVolume()
                     }
                 }
-            } else smoothlyRestoreConversationVolume()
+            }
+            if (fading) driveConversationFade()
         }
 
         override fun onControlCommandReceived(controlCommand: ByteArray) {
@@ -1335,6 +1379,7 @@ object L2CAPController {
             this.addAction(HyperPodsAction.ACTION_PODS_SETTINGS_CHANGED)
             this.addAction(HyperPodsAction.ACTION_PODS_RENAME)
             this.addAction(HyperPodsAction.ACTION_PODS_STATUS_RETRY)
+            this.addAction(HyperPodsAction.ACTION_XIAOMI_STATE_REQUEST)
             this.addAction(HyperPodsAction.ACTION_PODS_DIAGNOSTICS_REQUEST)
             this.addAction(HyperPodsAction.ACTION_HEAD_TRACKING_COMMAND)
             if (BuildConfig.BUILD_TYPE == "debug") this.addAction(HyperPodsAction.ACTION_REQUEST_CONTROL_OWNERSHIP)
@@ -1573,10 +1618,11 @@ object L2CAPController {
     }
 
     private fun clearPendingSettings() {
+        offModeJob?.cancel()
+        offModeJob = null
         pendingSettings.values.forEach { it.timeout.cancel() }
         pendingSettings.clear()
         failedSettings.clear()
-        pendingOffSelection = false
         pendingRename = null
         renameTimeout?.cancel()
         renameTimeout = null
@@ -1646,6 +1692,10 @@ object L2CAPController {
                 putExtra("initialization_failed", lastStatusFailure.isNotEmpty())
                 HyperPodsBroadcasts.send(it, this)
             }
+            Intent(HyperPodsAction.ACTION_PODS_DISCONNECTED).apply {
+                putExtra("address", device.address)
+                HyperPodsBroadcasts.send(it, this, HyperPodsBroadcasts.SYSTEM_UI)
+            }
             runCatching { it.unregisterReceiver(broadcastReceiver) }
         }
 
@@ -1680,21 +1730,53 @@ object L2CAPController {
 
     @Synchronized
     fun setANCMode(mode: Int) {
-        Log.d(TAG, "setANCMode: $mode")
-        if (pendingOffSelection) return
-        // A user choice must replace the automatic request, not be rejected by
-        // its pending confirmation. Do not cancel an unrelated user request.
+        if (mode !in 1..4) return
+        Log.i(TAG, "setANCMode: $mode")
+        // Match LibrePods: write the listening mode directly. Some firmware never
+        // reports ALLOW_OFF_OPTION, so using it as a prerequisite blocks Off forever.
         cancelSinglePodAncRestore()
+        // An explicit user choice supersedes an unanswered earlier mode request.
+        // Without this, a lost 0x0D echo can make every later Off tap a no-op.
+        pendingSettings.remove(PodsSettings.NOISE_MODE)?.timeout?.cancel()
+        failedSettings.remove(PodsSettings.NOISE_MODE)
+        offModeJob?.cancel()
+        offModeJob = null
         singlePodAnc.selectMode(mode)
+        val manager = aacpManager
         val model = currentPodsInfo?.modelNumber?.let(AirPodsModels::getModelByModelNumber)
-        if (mode == 1 && PodsSettings.supports(HyperPodsPrefsKey.ALLOW_OFF_OPTION, model) &&
-            confirmedSettings()[HyperPodsPrefsKey.ALLOW_OFF_OPTION] != 1) {
-            if (pendingSettings.containsKey(PodsSettings.NOISE_MODE) ||
-                pendingSettings.containsKey(HyperPodsPrefsKey.ALLOW_OFF_OPTION)) return
-            // Only an explicit Off click enables this firmware option. Wait for
-            // its acknowledgement before issuing the listening-mode command.
-            pendingOffSelection = true
-            sendSetting(HyperPodsPrefsKey.ALLOW_OFF_OPTION, 1)
+        if (mode == NoiseControlMode.OFF.ordinal + 1 && manager != null &&
+            PodsSettings.supports(HyperPodsPrefsKey.ALLOW_OFF_OPTION, model) &&
+            manager.sendControlCommand(
+                AACPManager.Companion.ControlCommandIdentifiers.ALLOW_OFF_OPTION.value, 1)) {
+            // Pro 2/3 firmware rejects LISTENING_MODE=Off until 0x34 has been applied.
+            // Keep the writes ordered, but give the firmware a short turn to commit the option.
+            val generation = sessionId
+            offModeJob = CoroutineScope(Dispatchers.Default).launch {
+                try {
+                    delay(300)
+                    val sent = synchronized(this@L2CAPController) {
+                        ensureActive()
+                        if (sessionId == generation && aacpManager === manager) {
+                            sendSetting(PodsSettings.NOISE_MODE, 1)
+                            true
+                        } else false
+                    }
+                    if (sent) {
+                        delay(600)
+                        synchronized(this@L2CAPController) {
+                            ensureActive()
+                            if (sessionId == generation && aacpManager === manager &&
+                                pendingSettings[PodsSettings.NOISE_MODE]?.value == 1) {
+                                manager.sendNotificationRequest()
+                            }
+                        }
+                    }
+                } finally {
+                    synchronized(this@L2CAPController) {
+                        if (offModeJob === coroutineContext[Job]) offModeJob = null
+                    }
+                }
+            }
             return
         }
         sendSetting(PodsSettings.NOISE_MODE, mode)
@@ -1806,22 +1888,28 @@ object L2CAPController {
         conversationRouteId = null
     }
 
-    private fun smoothlyRestoreConversationVolume() {
+    private fun driveConversationFade() {
         if (conversationRestoreJob?.isActive == true) return
         val generation = sessionId
         conversationRestoreJob = CoroutineScope(Dispatchers.Default).launch {
-            while (true) {
-                delay(50)
-                val more = synchronized(this@L2CAPController) {
-                    ensureActive()
-                    if (sessionId != generation) false
-                    else if (!conversationRouteIsSelected()) {
-                        resetConversationVolume()
-                        false
-                    } else runCatching { conversationVolume.restoreStep() }
-                        .onFailure { Log.w(TAG, "Unable to restore conversation volume") }.getOrDefault(false)
+            try {
+                while (true) {
+                    delay(ConversationFade.STEP_MS.toLong())
+                    val more = synchronized(this@L2CAPController) {
+                        ensureActive()
+                        if (sessionId != generation) false
+                        else if (!conversationRouteIsSelected()) {
+                            resetConversationVolume()
+                            false
+                        } else runCatching { conversationVolume.step() }
+                            .onFailure { Log.w(TAG, "Unable to fade conversation volume") }.getOrDefault(false)
+                    }
+                    if (!more) return@launch
                 }
-                if (!more) return@launch
+            } finally {
+                synchronized(this@L2CAPController) {
+                    if (conversationRestoreJob === coroutineContext[Job]) conversationRestoreJob = null
+                }
             }
         }
     }

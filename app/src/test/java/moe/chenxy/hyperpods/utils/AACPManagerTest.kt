@@ -371,10 +371,10 @@ class AACPManagerTest {
         `when`(socket.isConnected).thenReturn(true)
         `when`(socket.outputStream).thenReturn(ByteArrayOutputStream())
         val sender = AACPManager(socket)
-        assertTrue(sender.sendControlCommand(0x34, true))
-        assertTrue(sender.sendControlCommand(0x34, 2))
-        assertTrue(sender.sendControlCommand(0x34, 1.toByte()))
-        assertTrue(sender.sendControlCommand(0x34, byteArrayOf(2)))
+        assertTrue(sender.sendControlCommand(0x18, true))
+        assertTrue(sender.sendControlCommand(0x18, 2))
+        assertTrue(sender.sendControlCommand(0x18, 1.toByte()))
+        assertTrue(sender.sendControlCommand(0x18, byteArrayOf(2)))
         assertTrue(sender.controlCommandStatusList.isEmpty())
     }
 

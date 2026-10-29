@@ -15,8 +15,10 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -73,8 +75,14 @@ fun MainUI() {
     var pendingSettings by remember { mutableStateOf<Set<String>>(emptySet()) }
     val settingFeedback = remember { mutableStateMapOf<String, String>() }
     var conversationPhoneVolume by remember { mutableStateOf(initialPolicy.conversationVolume) }
+    var conversationFadeInMs by remember { mutableIntStateOf(initialPolicy.conversationFadeInMs) }
+    var conversationFadeOutMs by remember { mutableIntStateOf(initialPolicy.conversationFadeOutMs) }
     var headGestures by remember { mutableStateOf(initialPolicy.headGestures) }
     var diagnostics by remember { mutableStateOf<Bundle?>(null) }
+    LaunchedEffect(appPolicy.conversationFadeInMs, appPolicy.conversationFadeOutMs) {
+        conversationFadeInMs = appPolicy.conversationFadeInMs
+        conversationFadeOutMs = appPolicy.conversationFadeOutMs
+    }
     val personlizedVolume = remember { mutableStateOf(false) }
     val adaptiveAudioLevel = remember { mutableFloatStateOf(0.5f) }
     val adjustVolumeBySwiper = remember { mutableStateOf(false) }
@@ -285,12 +293,20 @@ fun MainUI() {
             settings = settings.toMap(), pendingSettings = pendingSettings,
             settingFeedback = settingFeedback.toMap(),
             conversationPhoneVolume = conversationPhoneVolume,
+            conversationFadeInMs = conversationFadeInMs,
+            conversationFadeOutMs = conversationFadeOutMs,
             headGestures = headGestures,
             onHeadGesturesChange = {
                 if (savePolicy(AppPreferences.read(context).copy(headGestures = it))) headGestures = it
             },
             onConversationPhoneVolumeChange = {
                 if (savePolicy(AppPreferences.read(context).copy(conversationVolume = it))) conversationPhoneVolume = it
+            },
+            onConversationFadeInChange = {
+                if (savePolicy(AppPreferences.read(context).copy(conversationFadeInMs = it))) conversationFadeInMs = it
+            },
+            onConversationFadeOutChange = {
+                if (savePolicy(AppPreferences.read(context).copy(conversationFadeOutMs = it))) conversationFadeOutMs = it
             },
             onAllowOffChange = { sendBooleanSetting(context, HyperPodsPrefsKey.ALLOW_OFF_OPTION, it) },
             onSettingChange = { key, value -> sendPodsSetting(context, key, value) },
@@ -334,6 +350,10 @@ fun AppHorizontalPager(
     settingFeedback: Map<String, String> = emptyMap(),
     conversationPhoneVolume: Boolean = true,
     onConversationPhoneVolumeChange: (Boolean) -> Unit = {},
+    conversationFadeInMs: Int = 300,
+    conversationFadeOutMs: Int = 700,
+    onConversationFadeInChange: (Int) -> Unit = {},
+    onConversationFadeOutChange: (Int) -> Unit = {},
     headGestures: Boolean = false,
     onHeadGesturesChange: (Boolean) -> Unit = {},
     onAllowOffChange: (Boolean) -> Unit = {},
@@ -352,6 +372,10 @@ fun AppHorizontalPager(
                                 settings = settings, pendingSettings = pendingSettings, onAllowOffChange = onAllowOffChange,
                                 settingFeedback = settingFeedback, conversationPhoneVolume = conversationPhoneVolume,
                                 onConversationPhoneVolumeChange = onConversationPhoneVolumeChange,
+                                conversationFadeInMs = conversationFadeInMs,
+                                conversationFadeOutMs = conversationFadeOutMs,
+                                onConversationFadeInChange = onConversationFadeInChange,
+                                onConversationFadeOutChange = onConversationFadeOutChange,
                                 headGestures = headGestures, onHeadGesturesChange = onHeadGesturesChange,
                                 onSettingChange = onSettingChange, diagnostics = diagnostics,
                                 allowUnfinishedFeatures = allowUnfinishedFeatures,

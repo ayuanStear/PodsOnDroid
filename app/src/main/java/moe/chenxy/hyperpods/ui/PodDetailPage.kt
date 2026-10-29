@@ -46,8 +46,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import moe.chenxy.hyperpods.R
 import moe.chenxy.hyperpods.pods.NoiseControlMode
+import moe.chenxy.hyperpods.utils.ConversationFade
 import moe.chenxy.hyperpods.ui.components.DashboardBattery
 import moe.chenxy.hyperpods.ui.components.ChimeVolumeSlider
+import moe.chenxy.hyperpods.ui.components.ConversationFadeSlider
 import moe.chenxy.hyperpods.ui.components.DashboardHero
 import moe.chenxy.hyperpods.ui.components.PageScaffold
 import moe.chenxy.hyperpods.ui.components.PageTransitionHost
@@ -109,6 +111,10 @@ fun PodDetailPage(
     settingFeedback: Map<String, String> = emptyMap(),
     conversationPhoneVolume: Boolean = true,
     onConversationPhoneVolumeChange: (Boolean) -> Unit = {},
+    conversationFadeInMs: Int = ConversationFade.DEFAULT_IN_MS,
+    conversationFadeOutMs: Int = ConversationFade.DEFAULT_OUT_MS,
+    onConversationFadeInChange: (Int) -> Unit = {},
+    onConversationFadeOutChange: (Int) -> Unit = {},
     headGestures: Boolean = false,
     onHeadGesturesChange: (Boolean) -> Unit = {},
     onAllowOffChange: (Boolean) -> Unit = {},
@@ -192,9 +198,7 @@ fun PodDetailPage(
                             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                                 DashboardSection(stringResource(R.string.dashboard_noise))
                                 DashboardNoise(ancMode, onAncModeChange,
-                                    if (ready(PodsSettings.NOISE_MODE) && Key.ALLOW_OFF_OPTION !in pendingSettings) allowedModes + 1 else emptySet())
-                                if (1 !in allowedModes) Text(stringResource(R.string.off_mode_enable_on_select),
-                                    fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                                    if (ready(PodsSettings.NOISE_MODE)) allowedModes else emptySet())
                                 if (ancMode == null) Text(stringResource(R.string.settings_reading), fontSize = 13.sp)
                             }
                         }
@@ -333,6 +337,23 @@ fun PodDetailPage(
                             checked = conversationPhoneVolume,
                             onCheckedChange = onConversationPhoneVolumeChange,
                         )
+                        if (PodsSettings.supports(Key.CONVERSATION_AWARENESS, model) &&
+                            conversationPhoneVolume) {
+                            DashboardDivider(Modifier.padding(horizontal = 16.dp))
+                            ConversationFadeSlider(
+                                title = R.string.conversation_fade_in_title,
+                                valueMs = conversationFadeInMs,
+                                testTag = "conversation_fade_in_slider",
+                                onChange = onConversationFadeInChange,
+                            )
+                            DashboardDivider(Modifier.padding(horizontal = 16.dp))
+                            ConversationFadeSlider(
+                                title = R.string.conversation_fade_out_title,
+                                valueMs = conversationFadeOutMs,
+                                testTag = "conversation_fade_out_slider",
+                                onChange = onConversationFadeOutChange,
+                            )
+                        }
                         if (PodsSettings.supports(Key.CHIME_VOLUME, model)) ChimeVolumeSlider(
                             value = settings[Key.CHIME_VOLUME], feedback = settingFeedback[Key.CHIME_VOLUME],
                             enabled = ready(Key.CHIME_VOLUME), status = statusText(Key.CHIME_VOLUME),

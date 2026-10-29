@@ -399,6 +399,9 @@ class AACPManager(val socket: BluetoothSocket, private val writer: ((ByteArray) 
 
     fun sendControlCommand(identifier: Byte, value: ByteArray): Boolean {
         val controlPacket = createControlCommandPacket(identifier, value)
+        if (identifier == ControlCommandIdentifiers.LISTENING_MODE.value) {
+            Log.i(TAG, "Writing listening mode ${value.firstOrNull()?.toInt()?.and(0xff)}")
+        }
         if (!sendDataPacket(controlPacket)) return false
         if (BuildConfig.DEBUG) Log.d(TAG, "Control command sent: ${"%02X".format(identifier)} - ${value.take(4).joinToString(" ") { "%02X".format(it) }}")
         // Match LibrePods' optimistic UI for selected firmware controls only.
@@ -562,6 +565,9 @@ class AACPManager(val socket: BluetoothSocket, private val writer: ((ByteArray) 
                         controlCommand.value.joinToString(" ") { "%02X".format(it) }
                     }"
                 )
+                if (controlCommand.identifier == ControlCommandIdentifiers.LISTENING_MODE.value) {
+                    Log.i(TAG, "Listening mode reported ${value}")
+                }
                 val controlCommandIdentifier =
                     ControlCommandIdentifiers.fromByte(controlCommand.identifier)
                 if (controlCommandIdentifier == ControlCommandIdentifiers.OWNS_CONNECTION) {

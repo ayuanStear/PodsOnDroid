@@ -60,6 +60,10 @@ internal fun HeadphonePanelContent(
     maxHeightDp: Float,
     connected: Boolean,
     onMode: (Int) -> Unit,
+    spatialAudioSupported: Boolean = false,
+    spatialAudioActive: Boolean = false,
+    spatialAudioFailed: Boolean = false,
+    onSpatialAudioChange: (Boolean) -> Unit = {},
     onMore: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -95,9 +99,12 @@ internal fun HeadphonePanelContent(
         if (diagnostics?.getBoolean("ready") != true) Text(
             stringResource(dashboardConnectionStatus(diagnostics)), fontSize = 13.sp,
             color = PanelSecondary, modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp))
+        val controlConnected = connected && diagnostics?.getString("connection") == "connected"
         if (allowedModes.isNotEmpty()) {
-            PanelNoise(modeState, allowedModes,
-                diagnostics?.getBoolean("ready") == true && !hostPending && modeState.requested == null, onMode)
+            // The Interconnectivity panel mirrors the Xiaomi card: Off belongs to
+            // spatial audio; the noise-control row only exposes the three active modes.
+            PanelNoise(modeState, allowedModes - 1,
+                controlConnected && !hostPending && modeState.requested == null, onMode)
             val status = when {
                 modeState.failed -> R.string.panel_failed
                 modeState.requested != null || hostPending -> R.string.panel_sending
@@ -108,6 +115,11 @@ internal fun HeadphonePanelContent(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)) }
             Spacer(Modifier.height(8.dp))
         }
+        if (spatialAudioSupported) {
+            Spacer(Modifier.height(12.dp))
+            PanelSpatialAudio(controlConnected, spatialAudioActive, spatialAudioFailed, onSpatialAudioChange)
+        }
+        Spacer(Modifier.height(12.dp))
         PanelVolume(activity, connected)
         Spacer(Modifier.height(24.dp))
         Box(Modifier.fillMaxWidth().heightIn(min = 54.dp).clip(RoundedCornerShape(24.dp))
@@ -172,6 +184,42 @@ private fun PanelNoise(state: PanelModeState, supported: Set<Int>, enabled: Bool
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PanelSpatialAudio(
+    enabled: Boolean,
+    active: Boolean,
+    failed: Boolean,
+    onChange: (Boolean) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(PanelControl).padding(12.dp)) {
+        Text(stringResource(R.string.panel_spatial_audio), color = PanelSecondary, fontSize = 14.sp,
+            modifier = Modifier.padding(start = 4.dp, bottom = 10.dp))
+        Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            data class Option(val label: Int, val icon: Int, val on: Boolean)
+            listOf(
+                Option(R.string.off, R.drawable.dashboard_mode_off, false),
+                Option(R.string.panel_spatial_audio, R.drawable.dashboard_headphones, true),
+            ).forEach { option ->
+                val selected = active == option.on
+                val foreground = if (selected) Color(0xFF414147) else Color.White
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(18.dp))
+                    .background(if (selected) Color.White.copy(alpha = .92f) else Color.Transparent)
+                    .selectable(selected, enabled = enabled, role = Role.RadioButton,
+                        onClick = { onChange(option.on) })
+                    .alpha(if (enabled) 1f else .45f).padding(vertical = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(painterResource(option.icon), null, Modifier.size(22.dp),
+                        colorFilter = ColorFilter.tint(foreground))
+                    Text(stringResource(option.label), color = foreground, fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 6.dp))
+                }
+            }
+        }
+        if (failed) Text(stringResource(R.string.panel_spatial_audio_failed), color = PanelSecondary,
+            fontSize = 12.sp, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
     }
 }
 

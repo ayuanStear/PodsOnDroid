@@ -17,6 +17,7 @@ import kotlinx.coroutines.withTimeout
 import moe.chenxy.hyperpods.utils.AACPManager
 import moe.chenxy.hyperpods.utils.AirPods5
 import moe.chenxy.hyperpods.utils.AppPreferences
+import moe.chenxy.hyperpods.utils.ConversationVolume
 import moe.chenxy.hyperpods.utils.PodsSettings
 import moe.chenxy.hyperpods.utils.SystemIntegrations
 import moe.chenxy.hyperpods.utils.SystemProfile
@@ -65,6 +66,9 @@ class L2CAPControllerSettingsTest {
         field("batteryStateValid").set(controller, false)
         field("earDetectionStateValid").set(controller, false)
         field("conversationPhoneVolume").set(controller, true)
+        field("conversationFadeInMs").setInt(controller, 0)
+        field("conversationFadeOutMs").setInt(controller, 700)
+        (field("conversationVolume").get(controller) as ConversationVolume).setFadeDurations(0, 700)
         field("lowBatterySettings").set(controller, LowBatterySettings())
         field("lastStatusFailure").set(controller, "")
         field("lastSettingKey").set(controller, "")
@@ -352,53 +356,33 @@ class L2CAPControllerSettingsTest {
         field("pausedAudio").setBoolean(controller, false)
     }
 
-    @Test fun selectingOffEnablesTheOptionAndWaitsForConfirmationBeforeChangingMode() {
+    @Test fun selectingOffEnablesFirmwareOffOptionThenWritesListeningMode() {
         receive(0x0d, 4)
-        receive(0x34, 2)
         controller.setANCMode(1)
-        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x34, 1, 0, 0, 0), output.toByteArray())
-        assertTrue(field("pendingOffSelection").getBoolean(controller))
-        receive(0x34, 2) // A stale state report is not an acknowledgement.
-        assertEquals(11, output.size())
-        receive(0x34, 1)
-        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x34, 1, 0, 0, 0,
-            4, 0, 4, 0, 9, 0, 0x0d, 1, 0, 0, 0), output.toByteArray())
-        assertFalse(field("pendingOffSelection").getBoolean(controller))
+        runBlocking { delay(400) }
+        assertArrayEquals(byteArrayOf(
+            4, 0, 4, 0, 9, 0, 0x34, 1, 0, 0, 0,
+            4, 0, 4, 0, 9, 0, 0x0d, 1, 0, 0, 0,
+        ), output.toByteArray())
+        assertFalse(pending().containsKey(Key.ALLOW_OFF_OPTION))
+        assertEquals(1.toByte(), manager.getControlCommandStatus(
+            AACPManager.Companion.ControlCommandIdentifiers.ALLOW_OFF_OPTION)!!.value[0])
         assertTrue(pending().containsKey(PodsSettings.NOISE_MODE))
         assertEquals(PodsSettings.NOISE_MODE, field("lastSettingKey").get(controller))
         assertEquals("sent", field("lastSettingStatus").get(controller))
         assertEquals(4.toByte(), manager.getControlCommandStatus(AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE)!!.value[0])
         receive(0x0d, 1)
         assertTrue(pending().isEmpty())
+        assertEquals(1.toByte(), manager.getControlCommandStatus(AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE)!!.value[0])
     }
 
-    @Test fun alreadyEnabledOffDoesNotRewriteTheOption() {
-        receive(0x34, 1)
-        controller.setANCMode(1)
-        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x0d, 1, 0, 0, 0), output.toByteArray())
-    }
-
-    @Test fun failedOptionWriteCancelsOffSelectionWithoutSendingMode() {
+    @Test fun disconnectedOffWriteFailsWithoutQueuingOrInventingAReport() {
         receive(0x0d, 4)
         `when`(socket.isConnected).thenReturn(false)
         controller.setANCMode(1)
-        assertFalse(field("pendingOffSelection").getBoolean(controller))
-        assertEquals(0, output.size())
         assertTrue(pending().isEmpty())
-    }
-
-    @Test fun offOptionTimeoutNeverSendsOffAndAllowsAnotherClick() {
-        controller.setANCMode(1)
-        field("mContext").set(controller, null)
-        val deadline = System.nanoTime() + 7_000_000_000L
-        while (synchronized(controller) { pending().isNotEmpty() } && System.nanoTime() < deadline) Thread.sleep(20)
-        assertFalse(field("pendingOffSelection").getBoolean(controller))
-        assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x34, 1, 0, 0, 0) +
-            manager.createDataPacket(manager.createRequestNotificationPacket()), output.toByteArray())
-        field("mContext").set(controller, ContextWrapper(null))
-        controller.setANCMode(1)
-        assertTrue(field("pendingOffSelection").getBoolean(controller))
-        assertEquals(32, output.size())
+        assertEquals("write_failed", field("lastSettingStatus").get(controller))
+        assertEquals(4.toByte(), manager.getControlCommandStatus(AACPManager.Companion.ControlCommandIdentifiers.LISTENING_MODE)!!.value[0])
     }
 
     private fun initialReady(): Boolean = type.getDeclaredMethod("initialStatusReady")
@@ -480,28 +464,14 @@ class L2CAPControllerSettingsTest {
         assertFalse(controller.currentBatteryParams.left!!.isConnected)
     }
 
-    @Test fun disconnectAbandonsTheOffPrerequisiteAndCannotSendALateModeCommand() {
+    @Test fun disconnectClearsThePendingDirectOffRequest() {
         controller.setANCMode(1)
+        val sent = output.toByteArray()
         field("mContext").set(controller, null)
         controller.disconnectedPod(ContextWrapper(null), device)
-        receive(0x34, 1)
-        assertFalse(field("pendingOffSelection").getBoolean(controller))
+        receive(0x0d, 1)
         assertTrue(pending().isEmpty())
-        assertEquals(11, output.size())
-    }
-
-    @Test fun offPrerequisiteCanCompleteAfterItsSingleBoundedStatusRefresh() {
-        controller.setANCMode(1)
-        // Timer broadcasts use no-op stubs here; the protocol writer remains real.
-        field("mContext").set(controller, null)
-        Thread.sleep(3300)
-        synchronized(controller) {
-            assertEquals(21, output.size()) // Allow Off + one status subscription.
-            assertTrue(pending().containsKey(Key.ALLOW_OFF_OPTION))
-            receive(0x34, 1)
-            assertTrue(pending().containsKey(PodsSettings.NOISE_MODE))
-            assertEquals(32, output.size()) // Only a confirmed prerequisite sends real Off.
-        }
+        assertArrayEquals(sent, output.toByteArray())
     }
 
     @Test fun microphoneCanBeWrittenBeforeItsFirstReportAndLaterReportsAreAuthoritative() {
@@ -772,6 +742,20 @@ class L2CAPControllerSettingsTest {
         assertEquals("confirmed", field("lastSettingStatus").get(controller))
     }
 
+    @Test fun explicitModeSelectionSupersedesItsOwnUnansweredRequest() {
+        controller.setANCMode(2)
+        assertTrue(pending().containsKey(PodsSettings.NOISE_MODE))
+        output.reset()
+        controller.setANCMode(1)
+        runBlocking { delay(400) }
+        assertArrayEquals(byteArrayOf(
+            4, 0, 4, 0, 9, 0, 0x34, 1, 0, 0, 0,
+            4, 0, 4, 0, 9, 0, 0x0d, 1, 0, 0, 0,
+        ), output.toByteArray())
+        assertTrue(pending().containsKey(PodsSettings.NOISE_MODE))
+        receive(0x0d, 1)
+        assertTrue(pending().isEmpty())
+    }
     @Test fun conversationDoesNotGetOverriddenByAnAutomaticSingleAncRetry() {
         singlePodAncSession()
         manager.receivePacket(byteArrayOf(4, 0, 4, 0, 6, 0, 1, 0))

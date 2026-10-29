@@ -63,9 +63,12 @@ internal object DeviceCardArtworkHook {
             val result = chain.proceed()
             try {
                 val info = HostReflection.call(chain.args[0], "getDeviceInfo")!!
+                NativeDeviceCardBridge.observe(images.first().context)
+                NativeDeviceCardBridge.track(images.first())
                 if (HostReflection.call(info, "getDeviceType") != "third_headset" || requests.size >= 8)
                     return@intercept result
-                val id = HostReflection.call(info, "getId") as String
+                val cardAddress = deviceCardAddress(info)
+                val cardName = deviceCardName(info)
                 val context = SystemUiContext.resolve(images.first().context)
                 if (!registered) {
                     context.registerReceiver(receiver, IntentFilter(HyperPodsAction.ACTION_PODS_MAC_RECEIVED),
@@ -77,7 +80,9 @@ internal object DeviceCardArtworkHook {
                 val timeout = Runnable { requests.remove(token) }
                 requests[token] = { reply ->
                     handler.removeCallbacks(timeout)
-                    if (bindings[weakHolder.get()] == token && id.equals(reply.getStringExtra("mac"), true)) {
+                    if (bindings[weakHolder.get()] == token && matchesDeviceCard(
+                            cardAddress, cardName, reply.getStringExtra("mac"),
+                            reply.getStringExtra("device_name"))) {
                         val model = reply.getStringExtra("model_number")?.let(AirPodsModels::getModelByModelNumber)
                         if (model != null) {
                             try {

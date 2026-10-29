@@ -13,7 +13,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.test.espresso.Espresso
 import moe.chenxy.hyperpods.R
 import moe.chenxy.hyperpods.pods.NoiseControlMode
+import moe.chenxy.hyperpods.ui.components.HeadphonePanelContent
 import moe.chenxy.hyperpods.utils.AACPManager
+import moe.chenxy.hyperpods.utils.AirPods5
+import moe.chenxy.hyperpods.utils.PanelModeState
 import moe.chenxy.hyperpods.utils.PodsSettings
 import moe.chenxy.hyperpods.utils.data.BatteryParams
 import moe.chenxy.hyperpods.utils.data.EarDetectionParams
@@ -36,7 +39,7 @@ class IssueSettingsUiTest {
     private var failWrite = false
     private fun text(id: Int) = compose.activity.getString(id)
 
-    private fun render(connection: String = "connected") {
+    private fun render(connection: String = "connected", openMore: Boolean = true) {
         fun write(key: String, value: Int) {
             writes.add(key to value)
             if (!failWrite) settings.value = settings.value + (key to value)
@@ -71,7 +74,7 @@ class IssueSettingsUiTest {
                 }
             }
         }
-        compose.revealSetting(text(R.string.dashboard_more)).performClick()
+        if (openMore) compose.revealSetting(text(R.string.dashboard_more)).performClick()
     }
 
     @Test fun missingMicrophoneReportAllowsExplicitSelectionWithoutInventingAuto() {
@@ -245,5 +248,37 @@ class IssueSettingsUiTest {
         assertEquals(listOf(Key.ADJUST_VOLUME_BY_SWIPER to 1), writes)
         assertEquals(2, settings.value[Key.ADJUST_VOLUME_BY_SWIPER])
         compose.onNodeWithText(text(R.string.setting_write_failed), substring = true).assertExists()
+    }
+
+    @Test fun offModeCanBeSelectedWithoutAStatusReportWhileControlIsConnected() {
+        render(openMore = false)
+        compose.onNodeWithText(text(R.string.off)).assertIsEnabled().performClick()
+        assertEquals(listOf(NoiseControlMode.OFF), modes)
+    }
+
+    @Test fun panelOffModeUsesTheConnectedControlChannelRatherThanFullStatusReadiness() {
+        compose.runOnUiThread {
+            compose.activity.setContent {
+                AppTheme(1) {
+                    HeadphonePanelContent(
+                        activity = compose.activity,
+                        name = "Demo",
+                        battery = BatteryParams(PodBatteryParams(), PodBatteryParams(), PodBatteryParams()),
+                        model = AirPods5(),
+                        diagnostics = Bundle().apply { putString("connection", "connected") },
+                        modeState = PanelModeState(),
+                        hostPending = false,
+                        allowedModes = setOf(1, 2, 3, 4),
+                        maxHeightDp = 800f,
+                        connected = true,
+                        onMode = { modes.add(NoiseControlMode.entries[it - 1]) },
+                        onMore = {},
+                        onClose = {},
+                    )
+                }
+            }
+        }
+        compose.onNodeWithText(text(R.string.off)).assertIsEnabled().performClick()
+        assertEquals(listOf(NoiseControlMode.OFF), modes)
     }
 }

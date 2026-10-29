@@ -65,11 +65,24 @@ class PodsSettingsTest {
         assertFalse(PodsSettings.supports(Key.ADJUST_VOLUME_BY_SWIPER, AirPods4ANC()))
     }
 
-    @Test fun newerHeadsetsRequireConfirmedPermissionForOffMode() {
+    @Test fun everyListeningModeModelCanSelectOffDirectly() {
         val model = AirPodsPro2USBC()
-        assertEquals(setOf(2, 3, 4), PodsSettings.allowedNoiseModes(model, emptyMap()))
-        assertFalse(PodsSettings.validValue(PodsSettings.NOISE_MODE, 1, model, mapOf(Key.ALLOW_OFF_OPTION to 2)))
-        assertTrue(PodsSettings.validValue(PodsSettings.NOISE_MODE, 1, model, mapOf(Key.ALLOW_OFF_OPTION to 1)))
+        assertEquals(setOf(1, 2, 3, 4), PodsSettings.allowedNoiseModes(model, emptyMap()))
+        assertTrue(PodsSettings.validValue(PodsSettings.NOISE_MODE, 1, model, emptyMap()))
+        assertTrue(PodsSettings.validValue(PodsSettings.NOISE_MODE, 1, model, mapOf(Key.ALLOW_OFF_OPTION to 2)))
+    }
+
+    @Test fun noiseModeSelectionNeedsOnlyAConnectedControlChannel() {
+        val model = AirPods5()
+        assertTrue(PodsSettings.editable(
+            PodsSettings.NOISE_MODE, model, emptyMap(), emptySet(), connected = true,
+        ))
+        assertFalse(PodsSettings.editable(
+            PodsSettings.NOISE_MODE, model, emptyMap(), emptySet(), connected = false,
+        ))
+        assertFalse(PodsSettings.editable(
+            PodsSettings.NOISE_MODE, model, emptyMap(), setOf(PodsSettings.NOISE_MODE), connected = true,
+        ))
     }
 
     @Test fun invalidOrUnsupportedCommandsAreRejected() {
@@ -86,8 +99,7 @@ class PodsSettingsTest {
         val model = AirPodsPro2USBC()
         assertTrue(PodsSettings.validValue(Key.LISTENING_MODE_BYTE, 6, model, emptyMap()))
         assertFalse(PodsSettings.validValue(Key.LISTENING_MODE_BYTE, 2, model, emptyMap()))
-        assertFalse(PodsSettings.validValue(Key.LISTENING_MODE_BYTE, 7, model, emptyMap()))
-        assertTrue(PodsSettings.validValue(Key.LISTENING_MODE_BYTE, 7, model, mapOf(Key.ALLOW_OFF_OPTION to 1)))
+        assertTrue(PodsSettings.validValue(Key.LISTENING_MODE_BYTE, 7, model, emptyMap()))
         assertFalse(PodsSettings.validValue(Key.LISTENING_MODE_BYTE, 14, AirPodsPro1(), emptyMap()))
     }
 

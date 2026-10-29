@@ -19,6 +19,7 @@ import moe.chenxy.hyperpods.ui.AppTheme
 import moe.chenxy.hyperpods.ui.components.*
 import moe.chenxy.hyperpods.utils.*
 import moe.chenxy.hyperpods.utils.data.*
+import java.util.UUID
 import java.util.function.Consumer
 
 class HeadphonePanelActivity : ComponentActivity() {
@@ -83,6 +84,32 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
     var hostPending by remember { mutableStateOf(false) }
     var modeState by remember { mutableStateOf(PanelModeState()) }
     var request by remember { mutableIntStateOf(0) }
+    var spatialAudio by remember { mutableStateOf(false) }
+    var spatialSession by remember { mutableStateOf("") }
+    var spatialFailed by remember { mutableStateOf(false) }
+    val latestSpatialSession by rememberUpdatedState(spatialSession)
+    val latestSpatialAudio by rememberUpdatedState(spatialAudio)
+    fun sendHeadTracking(session: String, command: String) {
+        if (session.isEmpty()) return
+        HyperPodsBroadcasts.send(activity, Intent(HyperPodsAction.ACTION_HEAD_TRACKING_COMMAND)
+            .putExtra("session", session).putExtra("command", command), HyperPodsBroadcasts.BLUETOOTH)
+    }
+    fun setSpatialAudio(enabled: Boolean) {
+        if (enabled) {
+            if (spatialAudio) return
+            val session = UUID.randomUUID().toString()
+            spatialSession = session
+            spatialAudio = true
+            spatialFailed = false
+            sendHeadTracking(session, "start")
+        } else {
+            val session = spatialSession
+            spatialSession = ""
+            spatialAudio = false
+            spatialFailed = false
+            sendHeadTracking(session, "stop")
+        }
+    }
     DisposableEffect(activity) {
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -112,6 +139,17 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
                             if (!intent.getBooleanExtra("success", false)) modeState = modeState.fail()
                         }
                     }
+                    HyperPodsAction.ACTION_HEAD_TRACKING_SAMPLE -> {
+                        if (intent.getStringExtra("session") != spatialSession) return
+                        val state = intent.getStringExtra("state") ?: return
+                        spatialAudio = state in setOf("starting", "calibrating", "tracking")
+                        spatialFailed = state in setOf("unsupported", "not_ready", "not_worn",
+                            "interrupted", "write_failed", "no_data", "invalid_data", "stop_failed", "expired")
+                        if (state in setOf("stopped", "unsupported", "not_ready", "not_worn",
+                                "interrupted", "write_failed", "no_data", "invalid_data", "expired")) {
+                            spatialSession = ""
+                        }
+                    }
                 }
             }
         }
@@ -119,10 +157,22 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
             listOf(HyperPodsAction.ACTION_PODS_CONNECTED, HyperPodsAction.ACTION_PODS_DISCONNECTED,
                 HyperPodsAction.ACTION_PODS_BATTERY_CHANGED,
                 HyperPodsAction.ACTION_PODS_DIAGNOSTICS, HyperPodsAction.ACTION_PODS_SETTINGS_STATE,
-                HyperPodsAction.ACTION_PODS_SETTING_RESULT).forEach(::addAction)
+                HyperPodsAction.ACTION_PODS_SETTING_RESULT,
+                HyperPodsAction.ACTION_HEAD_TRACKING_SAMPLE).forEach(::addAction)
         }, Context.RECEIVER_EXPORTED)
         HyperPodsBroadcasts.send(activity, Intent(HyperPodsAction.ACTION_PODS_UI_INIT), HyperPodsBroadcasts.BLUETOOTH)
-        onDispose { activity.unregisterReceiver(receiver) }
+        onDispose {
+            if (latestSpatialAudio && latestSpatialSession.isNotEmpty()) {
+                sendHeadTracking(latestSpatialSession, "stop")
+            }
+            activity.unregisterReceiver(receiver)
+        }
+    }
+    LaunchedEffect(spatialAudio, spatialSession) {
+        while (spatialAudio && spatialSession.isNotEmpty()) {
+            delay(2000)
+            sendHeadTracking(spatialSession, "heartbeat")
+        }
     }
     LaunchedEffect(request) {
         if (request > 0) {
@@ -143,6 +193,10 @@ private fun Panel(activity: HeadphonePanelActivity, maxHeightDp: Float) {
             PodsSettings.allowedNoiseModes(model, values) else emptySet(),
         maxHeightDp = maxHeightDp,
         connected = info != null,
+        spatialAudioSupported = model?.capabilities?.contains(Capability.HEAD_GESTURES) == true,
+        spatialAudioActive = spatialAudio,
+        spatialAudioFailed = spatialFailed,
+        onSpatialAudioChange = ::setSpatialAudio,
         onMode = { mode ->
             modeState = modeState.select(mode)
             request++

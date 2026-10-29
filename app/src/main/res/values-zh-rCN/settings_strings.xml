@@ -18,4 +18,8 @@
     <string name="off_mode_enable_on_select">点击“关闭”会先启用耳机的关闭选项；此模式下不提供高音量保护。</string>
     <string name="long_press_shared">长按噪声循环（双耳共用）</string>
     <string name="long_press_shared_summary">至少选择两种模式，左右耳机共用此循环。</string>
+    <string name="conversation_fade_in_title">对话淡入时间</string>
+    <string name="conversation_fade_out_title">对话淡出时间</string>
+    <string name="conversation_fade_value">%1$d 毫秒</string>
+    <string name="conversation_fade_range">0–5000 毫秒，可按 50 毫秒调整</string>
 </resources>

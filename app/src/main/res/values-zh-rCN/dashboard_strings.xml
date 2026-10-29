@@ -25,4 +25,6 @@
     <string name="dashboard_detection_summary">摘下暂停，戴上继续</string>
     <string name="dashboard_detection_title">自动入耳检测</string>
     <string name="dashboard_conversation_title">对话感知</string>
+    <string name="panel_spatial_audio">空间音频</string>
+    <string name="panel_spatial_audio_failed">空间音频当前不可用，或耳机未启动该功能。</string>
 </resources>

@@ -36,6 +36,8 @@ object AppPreferences {
         val batteryNotifications: BatteryNotificationSettings = BatteryNotificationSettings(),
         val batteryNotificationsMigrationRequired: Boolean = false,
         val allowUnfinishedFeatures: Boolean = false,
+        val conversationFadeInMs: Int = ConversationFade.DEFAULT_IN_MS,
+        val conversationFadeOutMs: Int = ConversationFade.DEFAULT_OUT_MS,
     ) {
         fun encode(): String {
             require(batteryNotifications.valid) { "Battery thresholds must satisfy 1 <= low < medium <= 99" }
@@ -54,6 +56,8 @@ object AppPreferences {
                 Key.BATTERY_NOTIFICATION_MEDIUM_REMINDER to batteryNotifications.mediumReminderEnabled,
                 Key.BATTERY_NOTIFICATIONS_MIGRATION_REQUIRED to batteryNotificationsMigrationRequired,
                 Key.ALLOW_UNFINISHED_FEATURES to allowUnfinishedFeatures,
+                Key.CONVERSATION_FADE_IN_MS to ConversationFade.normalize(conversationFadeInMs),
+                Key.CONVERSATION_FADE_OUT_MS to ConversationFade.normalize(conversationFadeOutMs),
             )).toString()
         }
     }
@@ -101,6 +105,10 @@ object AppPreferences {
                     (json.has(Key.LOW_BATTERY_EARS) && json.opt(Key.LOW_BATTERY_EARS) !is Boolean),
                 if (json.has(Key.ALLOW_UNFINISHED_FEATURES))
                     json.get(Key.ALLOW_UNFINISHED_FEATURES) as Boolean else false,
+                conversationFadeInMs = (json.opt(Key.CONVERSATION_FADE_IN_MS) as? Int)
+                    ?.let(ConversationFade::normalize) ?: ConversationFade.DEFAULT_IN_MS,
+                conversationFadeOutMs = (json.opt(Key.CONVERSATION_FADE_OUT_MS) as? Int)
+                    ?.let(ConversationFade::normalize) ?: ConversationFade.DEFAULT_OUT_MS,
             )
         } catch (_: Exception) {
             Log.w("HyperPods-Preferences", "Rejected app settings: malformed JSON, missing field, or invalid field type")
@@ -174,6 +182,10 @@ object AppPreferences {
             boolean(Key.HEAD_GESTURES, fallback.headGestures),
             notifications,
             batteryNotificationsMigrationRequired = true,
+            conversationFadeInMs = (json.opt(Key.CONVERSATION_FADE_IN_MS) as? Int)
+                ?.let(ConversationFade::normalize) ?: fallback.conversationFadeInMs,
+            conversationFadeOutMs = (json.opt(Key.CONVERSATION_FADE_OUT_MS) as? Int)
+                ?.let(ConversationFade::normalize) ?: fallback.conversationFadeOutMs,
         )
     }
 
@@ -184,6 +196,8 @@ object AppPreferences {
         val battery = LowBatterySettings(boolean(Key.LOW_BATTERY_EARS),
             threshold(Key.LOW_BATTERY_EARS_THRESHOLD), boolean(Key.LOW_BATTERY_CASE),
             threshold(Key.LOW_BATTERY_CASE_THRESHOLD))
+        fun duration(key: String, default: Int) =
+            (values[key] as? Int)?.let(ConversationFade::normalize) ?: default
         return Snapshot(boolean(Key.EAR_DETECTION), boolean(Key.EAR_DETECTION_SWITCH_SPEAKER),
             boolean(Key.CONVERSATION_PHONE_VOLUME), battery,
             batteryNotifications = migrateBattery(battery),
@@ -191,7 +205,10 @@ object AppPreferences {
                 !BatteryNotificationSettings(lowThreshold = battery.earsThreshold).valid ||
                     (values.containsKey(Key.LOW_BATTERY_EARS_THRESHOLD) &&
                         values[Key.LOW_BATTERY_EARS_THRESHOLD] !is Int) ||
-                    (values.containsKey(Key.LOW_BATTERY_EARS) && values[Key.LOW_BATTERY_EARS] !is Boolean))
+                    (values.containsKey(Key.LOW_BATTERY_EARS) && values[Key.LOW_BATTERY_EARS] !is Boolean),
+            conversationFadeInMs = duration(Key.CONVERSATION_FADE_IN_MS, ConversationFade.DEFAULT_IN_MS),
+            conversationFadeOutMs = duration(Key.CONVERSATION_FADE_OUT_MS, ConversationFade.DEFAULT_OUT_MS),
+)
     }
 
     private fun migrateBattery(legacy: LowBatterySettings): BatteryNotificationSettings {

@@ -6,6 +6,8 @@ object HyperPodsPrefsKey {
     const val PERSONLIZED_VOLUME = "personlized_volume"
     const val CONVERSATION_AWARENESS = "conversation_awareness"
     const val CONVERSATION_PHONE_VOLUME = "conversation_phone_volume"
+    const val CONVERSATION_FADE_IN_MS = "conversation_fade_in_ms"
+    const val CONVERSATION_FADE_OUT_MS = "conversation_fade_out_ms"
     const val HEAD_GESTURES = "head_gestures"
     const val ALLOW_UNFINISHED_FEATURES = "allow_unfinished_features"
     const val SLEEP_DETECTION = "sleep_detection"

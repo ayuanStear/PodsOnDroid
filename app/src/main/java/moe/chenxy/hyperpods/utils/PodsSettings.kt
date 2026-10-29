@@ -31,12 +31,17 @@ object PodsSettings {
     // report is still authoritative; sending is not evidence that firmware applied it.
     val optimistic = setOf(Key.PERSONLIZED_VOLUME, Key.CONVERSATION_AWARENESS, Key.SLEEP_DETECTION,
         Key.MICROPHONE_MODE, Key.LISTENING_MODE_BYTE, Key.CHIME_VOLUME,
-        Key.ADJUST_VOLUME_BY_SWIPER, Key.SINGLE_POD_ANC)
+        Key.ADJUST_VOLUME_BY_SWIPER, Key.SINGLE_POD_ANC, Key.ALLOW_OFF_OPTION)
     // Older firmware may not report this newer option. It must not block battery,
     // the settings page or the existing initial-status recovery loop.
     val optionalReports = setOf(Key.SLEEP_DETECTION)
     val unfinished = setOf(Key.SWIPE_SPEED)
-    private val writableWithoutReport = setOf(Key.MICROPHONE_MODE, Key.LISTENING_MODE_BYTE, Key.SWIPE_SPEED)
+    // These commands can be selected as soon as the control channel is connected.
+    // Noise control must not wait for a battery/wear snapshot: an in-case headset can
+    // accept the AACP command while those status fields are incomplete.
+    private val writableWithoutReport = setOf(
+        NOISE_MODE, Key.MICROPHONE_MODE, Key.LISTENING_MODE_BYTE, Key.SWIPE_SPEED,
+    )
 
     fun editable(key: String, model: AirPodsBase?, values: Map<String, Int>,
                  pending: Set<String>, connected: Boolean, allowUnfinished: Boolean = false): Boolean =
@@ -78,10 +83,12 @@ object PodsSettings {
     fun allowedNoiseModes(model: AirPodsBase?, values: Map<String, Int>): Set<Int> {
         if (!supports(NOISE_MODE, model)) return emptySet()
         return buildSet {
-            if (Capability.LOUD_SOUND_REDUCTION !in model!!.capabilities || values[Key.ALLOW_OFF_OPTION] == 1) add(1)
+            // LibrePods writes LISTENING_MODE=Off directly. The firmware option
+            // queried by 0x34 is not a reliable prerequisite and can block the mode change.
+            add(1)
             add(2)
             add(3)
-            if (Capability.ADAPTIVE_AUDIO in model.capabilities) add(4)
+            if (Capability.ADAPTIVE_AUDIO in model!!.capabilities) add(4)
         }
     }
 

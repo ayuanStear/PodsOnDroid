@@ -28,28 +28,58 @@ object SystemUIPluginHook {
     private val savedGravity = Collections.synchronizedMap(WeakHashMap<View, Int>())
 
     fun install(framework: XposedInterface, classLoader: ClassLoader) {
+        Log.i("Art_Chen", "Installing SystemUI plugin discovery")
+        // Do not hook ClassLoader.loadClass itself. That hook runs for thousands of classes
+        // during SystemUI startup and makes HyperOS 4 ANR, which also triggers LSPosed safe mode.
+        // PluginInstance callbacks below install against the plugin loader without that cost.
         if (SystemEnvironment.current.supports(SystemFeature.NATIVE_BATTERY_ISLAND))
             installHook("notification-free battery bridge") { NativeBatteryIslandBridge.install(framework, classLoader) }
         val pluginInstance = Class.forName("com.android.systemui.shared.plugins.PluginInstance", false, classLoader)
         HostReflection.methods(pluginInstance, "loadPlugin").forEach { method ->
             framework.intercept(method) { chain ->
                 val result = chain.proceed()
-                val instance = chain.thisObject
-                val packageName = runCatching { HostReflection.call(instance, "getPackageName") }
-                    .getOrElse { HostReflection.call(instance, "getPackage") }
-                if (packageName == "miui.systemui.plugin") {
-                    val loader = pluginClassLoader(requireNotNull(instance))
-                    val firstLoad = synchronized(installedLoaders) { installedLoaders.add(loader) }
-                    pluginObserved = true
-                    if (firstLoad) {
-                        Log.i("Art_Chen", "Installing hooks in the loaded SystemUI plugin classloader")
-                        installPlugin(framework, loader)
+                runCatching {
+                    val instance = chain.thisObject
+                    val packageName = runCatching { HostReflection.call(instance, "getPackageName") }
+                        .getOrElse { HostReflection.call(instance, "getPackage") }
+                    if (packageName == "miui.systemui.plugin") {
+                        val loader = loadedPluginClassLoader(requireNotNull(instance))
+                        installOnce(framework, loader)
                     }
-                }
+                }.onFailure { Log.w("Art_Chen", "Unable to resolve loaded SystemUI plugin", it) }
+                result
+            }
+        }
+        HostReflection.methods(pluginInstance, "getPlugin").forEach { method ->
+            framework.intercept(method) { chain ->
+                val result = chain.proceed()
+                runCatching {
+                    val plugin = result as? Any
+                    val loader = plugin?.javaClass?.classLoader
+                    if (plugin != null && loader != null) {
+                        val packageName = runCatching { HostReflection.call(plugin, "getPackageName") }.getOrNull()
+                        if (packageName == null || packageName == "miui.systemui.plugin") installOnce(framework, loader)
+                    }
+                }.onFailure { Log.w("Art_Chen", "Unable to resolve SystemUI plugin instance", it) }
                 result
             }
         }
     }
+
+    private fun installOnce(framework: XposedInterface, loader: ClassLoader) {
+        val firstLoad = synchronized(installedLoaders) { installedLoaders.add(loader) }
+        if (!firstLoad) return
+        runCatching {
+            Log.i("Art_Chen", "Installing hooks in the loaded SystemUI plugin classloader")
+            installPlugin(framework, loader)
+            pluginObserved = true
+        }.onFailure { Log.e("Art_Chen", "Unable to install SystemUI plugin hooks", it) }
+    }
+
+    private fun loadedPluginClassLoader(instance: Any): ClassLoader = runCatching {
+        HostReflection.call(instance, "getPlugin")?.javaClass?.classLoader
+            ?: pluginClassLoader(instance)
+    }.getOrElse { pluginClassLoader(instance) }
 
     private fun pluginClassLoader(instance: Any): ClassLoader = runCatching {
         // HyperOS 4 creates the plugin context only when loadPlugin completes.
@@ -65,6 +95,7 @@ object SystemUIPluginHook {
     private fun installPlugin(framework: XposedInterface, loader: ClassLoader) {
         if (SystemEnvironment.current.supports(SystemFeature.SYSTEM_HEADPHONE_CARD)) {
             installHook("SystemUI device card") { DeviceCardHook.install(framework, loader) }
+            installHook("SystemUI native battery bridge") { NativeDeviceCardBridge.install(framework, loader) }
             installHook("SystemUI AirPods artwork") { DeviceCardArtworkHook.install(framework, loader) }
         }
         if (!SystemEnvironment.current.supports(SystemFeature.NATIVE_BATTERY_ISLAND)) return

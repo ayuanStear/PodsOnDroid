@@ -25,4 +25,6 @@
     <string name="dashboard_detection_summary">Pause when removed, resume when worn</string>
     <string name="dashboard_detection_title">Automatic ear detection</string>
     <string name="dashboard_conversation_title">Conversation awareness</string>
+    <string name="panel_spatial_audio">Spatial audio</string>
+    <string name="panel_spatial_audio_failed">Spatial audio is unavailable or the headset did not start it.</string>
 </resources>

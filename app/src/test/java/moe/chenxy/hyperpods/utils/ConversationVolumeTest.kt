@@ -6,94 +6,109 @@ import org.junit.Test
 class ConversationVolumeTest {
     private var volume = 10
     private var playing = true
-    private val controller = ConversationVolume({ volume }, { volume = it }, { playing })
+    private val controller = ConversationVolume({ volume }, { volume = it }, { playing },
+        fadeInMs = 150, fadeOutMs = 250)
+
+    private fun stepUntilStable(): Int {
+        var steps = 0
+        while (controller.step()) {
+            check(++steps < 100) { "Fade did not settle" }
+        }
+        return steps
+    }
+
+    private fun duck(expected: Int = 2) {
+        assertTrue(controller.onStatus(1))
+        stepUntilStable()
+        assertEquals(expected, volume)
+    }
 
     @Test fun repeatedSpeechEventsDoNotLowerVolumeAgain() {
-        for (status in listOf(1, 1, 2, 3)) controller.onStatus(status)
+        duck()
+        for (status in listOf(1, 2, 3)) assertFalse(controller.onStatus(status))
         assertEquals(2, volume)
-        controller.onStatus(6)
-        assertEquals(10, volume)
-        controller.onStatus(9)
+        assertTrue(controller.onStatus(6, smoothRestore = true))
+        stepUntilStable()
         assertEquals(10, volume)
     }
 
     @Test fun everyEndStateRestoresVolume() {
         for (status in 6..9) {
-            controller.onStatus(1)
-            controller.onStatus(status)
+            duck()
+            assertFalse(controller.onStatus(status))
             assertEquals(10, volume)
         }
     }
 
     @Test fun manualVolumeChangesArePreserved() {
-        controller.onStatus(1)
+        duck()
         volume = 4
-        controller.onStatus(6)
+        assertFalse(controller.onStatus(6, smoothRestore = true))
         assertEquals(4, volume)
-        controller.onStatus(1)
         controller.reset()
         assertEquals(4, volume)
     }
 
     @Test fun disablingOrDisconnectingRestoresOnce() {
-        controller.onStatus(1)
+        duck()
         controller.reset()
         controller.reset()
         assertEquals(10, volume)
     }
 
     @Test fun changingOutputsDiscardsTheOldTargetEvenWhenVolumesHappenToMatch() {
-        controller.onStatus(1)
-        controller.onStatus(6, smoothRestore = true)
+        duck()
+        assertTrue(controller.onStatus(6, smoothRestore = true))
         controller.reset(restore = false)
         assertEquals(2, volume)
         assertFalse(controller.restoreStep())
         volume = 15
-        controller.onStatus(1)
-        assertEquals(3, volume)
+        duck(expected = 3)
         controller.reset()
         assertEquals(15, volume)
     }
 
     @Test fun idleMediaAndUnknownEventsDoNotChangeVolume() {
         playing = false
-        controller.onStatus(1)
+        assertFalse(controller.onStatus(1))
         assertEquals(10, volume)
         playing = true
-        controller.onStatus(5)
+        assertFalse(controller.onStatus(5))
         assertEquals(10, volume)
     }
 
-    @Test fun smoothRestoreUsesGradualStepsAndFinishesAtTheOriginalVolume() {
-        controller.onStatus(1)
-        controller.onStatus(6, smoothRestore = true)
+    @Test fun configuredFadeInAndOutUseTheRequestedStepCounts() {
+        var inSteps = 0
+        assertTrue(controller.onStatus(1))
+        do { inSteps++ } while (controller.step() && inSteps < 20)
+        assertEquals(3, inSteps)
         assertEquals(2, volume)
-        repeat(7) {
-            assertTrue(controller.restoreStep())
-            assertEquals(3 + it, volume)
-        }
-        assertFalse(controller.restoreStep())
+
+        var outSteps = 0
+        assertTrue(controller.onStatus(6, smoothRestore = true))
+        do { outSteps++ } while (controller.step() && outSteps < 20)
+        assertEquals(5, outSteps)
         assertEquals(10, volume)
-        assertFalse(controller.restoreStep())
     }
 
     @Test fun aNewConversationDuringRestorationKeepsTheOriginalTarget() {
-        controller.onStatus(1)
-        controller.onStatus(6, smoothRestore = true)
-        repeat(3) { controller.restoreStep() }
-        assertEquals(5, volume)
-        controller.onStatus(1, smoothRestore = true)
+        duck()
+        assertTrue(controller.onStatus(6, smoothRestore = true))
+        repeat(3) { assertTrue(controller.restoreStep()) }
+        val partial = volume
+        assertTrue(partial in 3..8)
+        assertTrue(controller.onStatus(1))
+        stepUntilStable()
         assertEquals(2, volume)
-        assertFalse(controller.restoreStep())
-        controller.onStatus(6, smoothRestore = true)
-        repeat(10) { controller.restoreStep() }
+        assertTrue(controller.onStatus(6, smoothRestore = true))
+        stepUntilStable()
         assertEquals(10, volume)
     }
 
     @Test fun aManualChangeDuringTheFadeStopsAutomaticRestoration() {
-        controller.onStatus(1)
-        controller.onStatus(6, smoothRestore = true)
-        controller.restoreStep()
+        duck()
+        assertTrue(controller.onStatus(6, smoothRestore = true))
+        assertTrue(controller.restoreStep())
         volume = 5
         assertFalse(controller.restoreStep())
         controller.reset()
@@ -101,8 +116,8 @@ class ConversationVolumeTest {
     }
 
     @Test fun disablingDuringTheFadeRestoresImmediatelyOnce() {
-        controller.onStatus(1)
-        controller.onStatus(6, smoothRestore = true)
+        duck()
+        assertTrue(controller.onStatus(6, smoothRestore = true))
         controller.restoreStep()
         controller.reset()
         assertEquals(10, volume)
@@ -111,21 +126,33 @@ class ConversationVolumeTest {
 
     @Test fun aRejectedVolumeStepCannotLeaveAnEndlessRestorationLoop() {
         var reject = false
-        val limited = ConversationVolume({ volume }, { if (!reject) volume = it }, { true })
-        limited.onStatus(1)
-        limited.onStatus(6, smoothRestore = true)
+        val limited = ConversationVolume({ volume }, { if (!reject) volume = it }, { true },
+            fadeInMs = 0, fadeOutMs = 250)
+        assertFalse(limited.onStatus(1))
+        assertEquals(2, volume)
+        assertTrue(limited.onStatus(6, smoothRestore = true))
         reject = true
-        assertFalse(limited.restoreStep())
-        assertFalse(limited.restoreStep())
+        assertFalse(limited.step())
+        assertFalse(limited.step())
     }
 
-    @Test fun highResolutionVolumeRestoresInAtMostTenSteps() {
+    @Test fun highResolutionVolumeRestoresToTheExactOriginalLevel() {
         volume = 150
-        controller.onStatus(1)
-        controller.onStatus(6, smoothRestore = true)
-        var steps = 0
-        do { steps++ } while (controller.restoreStep() && steps <= 10)
-        assertTrue(steps <= 10)
+        duck(expected = 30)
+        assertTrue(controller.onStatus(6, smoothRestore = true))
+        stepUntilStable()
         assertEquals(150, volume)
+    }
+
+    @Test fun outOfRangeDurationsAreClampedToSupportedBounds() {
+        val immediate = ConversationVolume({ volume }, { volume = it }, { true },
+            fadeInMs = -1, fadeOutMs = ConversationFade.MAX_MS + 10_000)
+        assertFalse(immediate.onStatus(1))
+        assertEquals(2, volume)
+        assertTrue(immediate.onStatus(6, smoothRestore = true))
+        var steps = 0
+        do { steps++ } while (immediate.step() && steps < 200)
+        assertTrue(steps in 1..100)
+        assertEquals(10, volume)
     }
 }

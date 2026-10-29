@@ -28,7 +28,9 @@ class AppPreferencesTest {
 
     @Test fun allPolicyChoicesRoundTripWithoutResettingOtherSwitches() {
         assertEquals(snapshot, AppPreferences.decode(snapshot.encode()))
-        assertEquals(14, JSONObject(snapshot.encode()).length())
+        assertEquals(16, JSONObject(snapshot.encode()).length())
+        val customized = snapshot.copy(conversationFadeInMs = 450, conversationFadeOutMs = 1200)
+        assertEquals(customized, AppPreferences.decode(customized.encode()))
         assertEquals(snapshot.copy(headGestures = true), AppPreferences.decode(snapshot.copy(headGestures = true).encode()))
     }
 
