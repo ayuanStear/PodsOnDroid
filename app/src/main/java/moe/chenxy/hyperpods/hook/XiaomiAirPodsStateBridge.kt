@@ -36,6 +36,7 @@ internal object XiaomiAirPodsStateBridge {
     private const val VALUE = "extra_value"
     private const val COMMAND_STATE = "extra_command_state"
     private const val AIR_ANC = "air_anc"
+    private const val AIR_WEAR_STATE = "air_wear_state"
     private const val REQUEST_THROTTLE_MS = 1500L
 
     internal data class Snapshot(
@@ -151,8 +152,9 @@ internal object XiaomiAirPodsStateBridge {
         val next = current.copy(address = address, earMask = earMask(status))
         snapshot = next
         persistState(context, next)
+        persistWearState(context, address, status)
         notifyStateChanged(context)
-        Log.i(TAG, "Native wear state updated: earMask=${next.earMask}")
+        Log.i(TAG, "Native wear state updated: earMask=${next.earMask} airWearState=${nativeWearState(earMask(status))}")
     }
 
     private fun onAnc(context: Context, intent: Intent) {
@@ -235,6 +237,7 @@ internal object XiaomiAirPodsStateBridge {
             earMask = parsed[4].toIntOrNull() ?: 0,
             ancCode = prefs.getString("$address-$AIR_ANC", "").orEmpty(),
         )
+        prefs.edit().putString("$address-$AIR_WEAR_STATE", nativeWearState(snapshot.earMask)).apply()
     }
 
     private fun persistState(context: Context, state: Snapshot) {
@@ -253,6 +256,18 @@ internal object XiaomiAirPodsStateBridge {
     private fun notifyStateChanged(context: Context) {
         context.contentResolver.notifyChange(
             Uri.parse("content://$AUTHORITY/airpodsstate"), null)
+    }
+
+    private fun persistWearState(context: Context, address: String, status: EarDetectionParams) {
+        val wear = nativeWearState(earMask(status))
+        context.getSharedPreferences(AIRPODS_PREFS, Context.MODE_PRIVATE).edit()
+            .putString("$address-$AIR_WEAR_STATE", wear)
+            .apply()
+        val uri = Uri.parse("content://$AUTHORITY/airpodsRepository").buildUpon()
+            .appendQueryParameter(AIR_WEAR_STATE, wear)
+            .appendQueryParameter("address", address)
+            .build()
+        context.contentResolver.notifyChange(uri, null)
     }
 
     private fun notifyAncChanged(context: Context, address: String, code: String) {
@@ -301,6 +316,12 @@ internal object XiaomiAirPodsStateBridge {
         if (status.left == EarDetectionStatus.IN_EAR) mask = mask or 1
         if (status.right == EarDetectionStatus.IN_EAR) mask = mask or 2
         return mask
+    }
+
+    internal fun nativeWearState(earMask: Int): String {
+        val left = if (earMask and 1 != 0) "01" else "00"
+        val right = if (earMask and 2 != 0) "01" else "00"
+        return left + right
     }
 
     internal fun batteryValue(value: PodBatteryParams?): String =

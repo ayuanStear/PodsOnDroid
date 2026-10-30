@@ -29,6 +29,13 @@ class XiaomiAirPodsStateBridgeTest {
             EarDetectionParams(EarDetectionStatus.IN_EAR, EarDetectionStatus.IN_EAR)))
     }
 
+    @Test fun nativeWearStateMatchesTheNativeHexEncoding() {
+        assertEquals("0000", XiaomiAirPodsStateBridge.nativeWearState(0))
+        assertEquals("0100", XiaomiAirPodsStateBridge.nativeWearState(1))
+        assertEquals("0001", XiaomiAirPodsStateBridge.nativeWearState(2))
+        assertEquals("0101", XiaomiAirPodsStateBridge.nativeWearState(3))
+    }
+
     @Test fun ancCodesMatchTheNativeSettingsPlugin() {
         assertEquals("01", XiaomiAirPodsStateBridge.ancCode(1))
         assertEquals("02", XiaomiAirPodsStateBridge.ancCode(2))
