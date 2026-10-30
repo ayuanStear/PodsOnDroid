@@ -319,8 +319,10 @@ internal object XiaomiAirPodsStateBridge {
     }
 
     internal fun nativeWearState(earMask: Int): String {
-        val left = if (earMask and 1 != 0) "01" else "00"
-        val right = if (earMask and 2 != 0) "01" else "00"
+        // Native air_wear_state encodes each ear as its AACP wear byte:
+        // 0x00 = in-ear, 0x01 = out-of-ear, 0x02 = in-case.
+        val left = if (earMask and 1 != 0) "00" else "01"
+        val right = if (earMask and 2 != 0) "00" else "01"
         return left + right
     }
 
