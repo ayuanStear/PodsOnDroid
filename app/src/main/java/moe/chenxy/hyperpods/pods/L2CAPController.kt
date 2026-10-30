@@ -379,6 +379,7 @@ object L2CAPController {
         }
         Intent(HyperPodsAction.ACTION_EAR_DETECTION_STATUS_CHANGED).apply {
             putExtra("status", status)
+            if (::mDevice.isInitialized) putExtra("address", mDevice.address)
             addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             HyperPodsBroadcasts.send(mContext, this, HyperPodsBroadcasts.XIAOMI_BLUETOOTH)
         }

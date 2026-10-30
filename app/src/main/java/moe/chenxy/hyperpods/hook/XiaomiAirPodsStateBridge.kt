@@ -146,11 +146,13 @@ internal object XiaomiAirPodsStateBridge {
     private fun onEarDetection(context: Context, intent: Intent) {
         val status = intent.getParcelableExtra("status", EarDetectionParams::class.java) ?: return
         val current = snapshot
-        if (current.address.isEmpty()) return
-        val next = current.copy(earMask = earMask(status))
+        val address = normalizedMac(intent.getStringExtra("address")) ?: current.address
+        if (address.isEmpty()) return
+        val next = current.copy(address = address, earMask = earMask(status))
         snapshot = next
         persistState(context, next)
         notifyStateChanged(context)
+        Log.i(TAG, "Native wear state updated: earMask=${next.earMask}")
     }
 
     private fun onAnc(context: Context, intent: Intent) {
