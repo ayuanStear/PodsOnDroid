@@ -247,16 +247,6 @@ class L2CAPControllerSettingsTest {
                 assertTrue(pending().isEmpty())
                 assertEquals(1.toByte(), manager.getControlCommandStatus(id)!!.value[0])
             }
-            output.reset()
-            request(Key.ADJUST_VOLUME_BY_SWIPER, 1)
-            if (number == "A3531") {
-                assertEquals(0, output.size())
-                assertEquals("invalid", field("lastSettingStatus").get(controller))
-            } else {
-                assertArrayEquals(byteArrayOf(4, 0, 4, 0, 9, 0, 0x25, 1, 0, 0, 0), output.toByteArray())
-                receive(0x25, 1)
-                assertTrue(pending().isEmpty())
-            }
         }
     }
 
@@ -596,7 +586,7 @@ class L2CAPControllerSettingsTest {
     }
 
     @Test fun issueControlsPublishSuccessfulWritesButNeverPretendTheyWereReported() {
-        for ((key, value) in listOf(Key.LISTENING_MODE_BYTE to 6, Key.ADJUST_VOLUME_BY_SWIPER to 1,
+        for ((key, value) in listOf(Key.LISTENING_MODE_BYTE to 6,
             Key.SINGLE_POD_ANC to 1)) {
             val id = PodsSettings.identifiers.getValue(key)
             request(key, value)

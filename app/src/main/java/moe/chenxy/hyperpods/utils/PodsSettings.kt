@@ -16,7 +16,6 @@ object PodsSettings {
         Key.CONVERSATION_AWARENESS to Id.CONVERSATION_DETECT_CONFIG,
         Key.SLEEP_DETECTION to Id.SLEEP_DETECTION_CONFIG,
         Key.ADAPTIVE_AUDIO_LEVEL to Id.AUTO_ANC_STRENGTH,
-        Key.ADJUST_VOLUME_BY_SWIPER to Id.VOLUME_SWIPE_MODE,
         Key.LISTENING_MODE_BYTE to Id.LISTENING_MODE_CONFIGS,
         Key.SINGLE_POD_ANC to Id.ONE_BUD_ANC_MODE,
         Key.MICROPHONE_MODE to Id.MIC_MODE,
@@ -31,7 +30,7 @@ object PodsSettings {
     // report is still authoritative; sending is not evidence that firmware applied it.
     val optimistic = setOf(Key.PERSONLIZED_VOLUME, Key.CONVERSATION_AWARENESS, Key.SLEEP_DETECTION,
         Key.MICROPHONE_MODE, Key.LISTENING_MODE_BYTE, Key.CHIME_VOLUME,
-        Key.ADJUST_VOLUME_BY_SWIPER, Key.SINGLE_POD_ANC, Key.ALLOW_OFF_OPTION)
+        Key.SINGLE_POD_ANC, Key.ALLOW_OFF_OPTION)
     // Older firmware may not report this newer option. It must not block battery,
     // the settings page or the existing initial-status recovery loop.
     val optionalReports = setOf(Key.SLEEP_DETECTION)
