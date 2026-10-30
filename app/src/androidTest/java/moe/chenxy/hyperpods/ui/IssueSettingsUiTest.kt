@@ -216,11 +216,10 @@ class IssueSettingsUiTest {
     }
 
     @Test fun sentOnlyControlsDoNotShowAnEndlessWaitingMessage() {
-        settings.value = mapOf(Key.CHIME_VOLUME to 50, Key.ADJUST_VOLUME_BY_SWIPER to 1, Key.SINGLE_POD_ANC to 1)
+        settings.value = mapOf(Key.CHIME_VOLUME to 50, Key.SINGLE_POD_ANC to 1)
         feedback.value = settings.value.keys.associateWith { "sent" }
         render()
-        for (title in listOf(R.string.control_chime_volume, R.string.adjust_volume_by_swiper_title,
-            R.string.noise_cancellation_single_airpod)) {
+        for (title in listOf(R.string.control_chime_volume, R.string.noise_cancellation_single_airpod)) {
             compose.revealSetting(text(title))
             compose.onAllNodesWithText(text(R.string.setting_sent), substring = true).assertCountEquals(0)
             compose.onAllNodesWithText(text(R.string.setting_pending), substring = true).assertCountEquals(0)
@@ -235,17 +234,6 @@ class IssueSettingsUiTest {
         assertEquals(listOf(Key.SINGLE_POD_ANC to 1), writes)
         assertEquals(emptyList<NoiseControlMode>(), modes)
         assertEquals(3, settings.value[PodsSettings.NOISE_MODE])
-    }
-
-    @Test fun aRealWriteFailureStillShowsAnErrorAndPreservesThePreviousSwitchValue() {
-        settings.value = mapOf(Key.ADJUST_VOLUME_BY_SWIPER to 2)
-        failWrite = true
-        render()
-        compose.revealSetting(text(R.string.adjust_volume_by_swiper_title)).performClick()
-        compose.waitForIdle()
-        assertEquals(listOf(Key.ADJUST_VOLUME_BY_SWIPER to 1), writes)
-        assertEquals(2, settings.value[Key.ADJUST_VOLUME_BY_SWIPER])
-        compose.onNodeWithText(text(R.string.setting_write_failed), substring = true).assertExists()
     }
 
     @Test fun offModeCanBeSelectedWithoutAStatusReportWhileControlIsConnected() {

@@ -115,7 +115,6 @@ class AACPManager(val socket: BluetoothSocket, private val writer: ((ByteArray) 
             CHIME_VOLUME(0x1F),
             VOLUME_SWIPE_INTERVAL(0x23),
             CALL_MANAGEMENT_CONFIG(0x24),
-            VOLUME_SWIPE_MODE(0x25),
             ADAPTIVE_VOLUME_CONFIG(0x26),
             SOFTWARE_MUTE_CONFIG(0x27),
             CONVERSATION_DETECT_CONFIG(0x28),

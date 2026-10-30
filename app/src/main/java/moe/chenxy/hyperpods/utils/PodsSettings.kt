@@ -68,7 +68,6 @@ object PodsSettings {
             Key.CONVERSATION_AWARENESS -> Capability.CONVERSATION_AWARENESS in model.capabilities
             Key.SLEEP_DETECTION -> Capability.SLEEP_DETECTION in model.capabilities
             Key.ADAPTIVE_AUDIO_LEVEL -> Capability.ADAPTIVE_AUDIO in model.capabilities
-            Key.ADJUST_VOLUME_BY_SWIPER -> Capability.SWIPE_FOR_VOLUME in model.capabilities
             Key.ALLOW_OFF_OPTION -> Capability.LOUD_SOUND_REDUCTION in model.capabilities
             Key.MICROPHONE_MODE -> model.supports(Capability.MICROPHONE_SELECTION)
             Key.PRESS_SPEED, Key.HOLD_DURATION -> model.supports(Capability.PRESS_TIMING)

@@ -54,7 +54,7 @@ class AirPods5SupportUiTest(private val number: String, private val wireless: Bo
         compose.waitForIdle()
         compose.revealSetting(text(R.string.control_press_speed)).assertExists()
         compose.revealSetting(text(R.string.control_hold_duration)).assertExists()
-        for (label in listOf(R.string.adjust_volume_by_swiper_title, R.string.control_swipe_speed)) {
+        for (label in listOf(R.string.control_swipe_speed)) {
             if (wireless) compose.revealSetting(text(label)).assertExists()
             else compose.onNodeWithText(text(label)).assertDoesNotExist()
         }

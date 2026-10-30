@@ -276,7 +276,6 @@ private fun settingTitle(key: String?): Int = when (key) {
     Key.ADAPTIVE_AUDIO_LEVEL -> R.string.adaptive_audio_title
     Key.ALLOW_OFF_OPTION -> R.string.allow_off_title
     Key.SINGLE_POD_ANC -> R.string.noise_cancellation_single_airpod
-    Key.ADJUST_VOLUME_BY_SWIPER -> R.string.adjust_volume_by_swiper_title
     Key.LISTENING_MODE_BYTE -> R.string.long_press_shared
     PodsSettings.NOISE_MODE -> R.string.dashboard_noise
     PodsSettings.RENAME -> R.string.rename_title

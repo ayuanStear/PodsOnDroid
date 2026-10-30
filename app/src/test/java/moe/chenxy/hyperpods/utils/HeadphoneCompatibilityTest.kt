@@ -13,8 +13,6 @@ class HeadphoneCompatibilityTest {
             assertEquals(timing, model.supports(Capability.PRESS_TIMING))
             assertEquals(timing, PodsSettings.supports(Key.PRESS_SPEED, model))
             assertEquals(timing, PodsSettings.supports(Key.HOLD_DURATION, model))
-            assertEquals(model.supports(Capability.SWIPE_FOR_VOLUME),
-                PodsSettings.supports(Key.ADJUST_VOLUME_BY_SWIPER, model))
         }
     }
 
@@ -33,7 +31,7 @@ class HeadphoneCompatibilityTest {
     @Test fun futureModelsDoNotInheritUndeclaredSettingFeatures() {
         val model = AirPodsBase(listOf("future"), "Future", budCaseRes = 0, budsRes = 0,
             leftBudsRes = 0, rightBudsRes = 0, caseRes = 0, capabilities = emptySet())
-        for (key in listOf(Key.MICROPHONE_MODE, Key.CHIME_VOLUME, Key.PRESS_SPEED, Key.ADJUST_VOLUME_BY_SWIPER))
+        for (key in listOf(Key.MICROPHONE_MODE, Key.CHIME_VOLUME, Key.PRESS_SPEED))
             assertFalse(PodsSettings.supports(key, model))
         assertFalse(model.needsSinglePodAncRecovery)
         assertNull(AirPodsModels.getModelByModelNumber("future"))

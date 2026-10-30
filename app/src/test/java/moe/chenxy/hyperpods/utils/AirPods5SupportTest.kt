@@ -49,11 +49,9 @@ class AirPods5SupportTest {
         standard.forEach { assertEquals(common, model(it).capabilities) }
         wireless.forEach { assertEquals(common + Capability.SWIPE_FOR_VOLUME, model(it).capabilities) }
         standard.forEach {
-            assertFalse(PodsSettings.supports(Key.ADJUST_VOLUME_BY_SWIPER, model(it)))
             assertFalse(PodsSettings.supports(Key.SWIPE_SPEED, model(it)))
         }
         wireless.forEach {
-            assertTrue(PodsSettings.supports(Key.ADJUST_VOLUME_BY_SWIPER, model(it)))
             for (value in 1..3) assertTrue(PodsSettings.validValue(Key.SWIPE_SPEED, value, model(it), emptyMap()))
         }
     }

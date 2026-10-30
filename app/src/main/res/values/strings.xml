@@ -29,8 +29,6 @@
     <string name="personlized_volume_summary">Adjusts the volume of media in response to your environment</string>
     <string name="loud_sound_reduction_title">Loud Sound Reduction</string>
     <string name="loud_sound_reduction_summary">Reduces loud sounds you are exposed to</string>
-    <string name="adjust_volume_by_swiper_title">Volume Control</string>
-    <string name="adjust_volume_by_swiper_summary">Adjust the volume by swiping up or down on the sensor located on the AirPods Pro stem</string>
     <string name="adaptive_audio_title">Adaptive Audio</string>
     <string name="less_noise">Less Noise</string>
     <string name="more_noise">More Noise</string>

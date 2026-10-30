@@ -62,7 +62,6 @@ class PodsSettingsTest {
             assertFalse(PodsSettings.supports(Key.PERSONLIZED_VOLUME, model))
         }
         assertEquals(setOf(1, 2, 3), PodsSettings.allowedNoiseModes(AirPodsPro1(), emptyMap()))
-        assertFalse(PodsSettings.supports(Key.ADJUST_VOLUME_BY_SWIPER, AirPods4ANC()))
     }
 
     @Test fun everyListeningModeModelCanSelectOffDirectly() {

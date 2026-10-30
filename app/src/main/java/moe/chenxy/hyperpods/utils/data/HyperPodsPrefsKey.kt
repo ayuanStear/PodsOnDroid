@@ -21,7 +21,6 @@ object HyperPodsPrefsKey {
     const val BATTERY_NOTIFICATION_MEDIUM_REMINDER = "battery_notification_medium_reminder"
     const val BATTERY_NOTIFICATIONS_MIGRATION_REQUIRED = "battery_notifications_migration_required"
     const val LOUD_SOUND_REDUCTION = "loud_sound_reduction"
-    const val ADJUST_VOLUME_BY_SWIPER = "adjust_volume_by_swiper"
     const val CASE_CHARGING_SOUND = "case_charging_sound"
     const val ADAPTIVE_AUDIO_LEVEL = "adaptive_audio_level"
     const val LISTENING_MODE_BYTE = "listening_mode_byte"
