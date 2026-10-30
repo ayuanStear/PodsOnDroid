@@ -587,7 +587,8 @@ class L2CAPControllerSettingsTest {
 
     @Test fun issueControlsPublishSuccessfulWritesButNeverPretendTheyWereReported() {
         for ((key, value) in listOf(Key.LISTENING_MODE_BYTE to 6,
-            Key.SINGLE_POD_ANC to 1)) {
+            Key.SINGLE_POD_ANC to 1,
+            Key.ADAPTIVE_AUDIO_LEVEL to 50)) {
             val id = PodsSettings.identifiers.getValue(key)
             request(key, value)
             assertFalse(pending().containsKey(key))
