@@ -85,7 +85,6 @@ fun MainUI() {
     }
     val personlizedVolume = remember { mutableStateOf(false) }
     val adaptiveAudioLevel = remember { mutableFloatStateOf(0.5f) }
-    val adjustVolumeBySwiper = remember { mutableStateOf(false) }
     val conversationAwareness = remember { mutableStateOf(false) }
     val noiseCancellationSingleAirPod = remember { mutableStateOf(false) }
     val canShowDetailPage = remember { mutableStateOf(false) }
@@ -139,7 +138,6 @@ fun MainUI() {
                         }
                         personlizedVolume.value = settings[HyperPodsPrefsKey.PERSONLIZED_VOLUME] == 1
                         conversationAwareness.value = settings[HyperPodsPrefsKey.CONVERSATION_AWARENESS] == 1
-                        adjustVolumeBySwiper.value = settings[HyperPodsPrefsKey.ADJUST_VOLUME_BY_SWIPER] == 1
                         noiseCancellationSingleAirPod.value = settings[HyperPodsPrefsKey.SINGLE_POD_ANC] == 1
                         adaptiveAudioLevel.floatValue = (100 - (settings[HyperPodsPrefsKey.ADAPTIVE_AUDIO_LEVEL] ?: 50)) / 100f
                         microphoneMode.value = PodsSettings.microphoneIndex(settings[HyperPodsPrefsKey.MICROPHONE_MODE]) ?: 0
@@ -264,10 +262,6 @@ fun MainUI() {
             onConversationAwarenessChange = {
                 sendBooleanSetting(context, HyperPodsPrefsKey.CONVERSATION_AWARENESS, it)
             },
-            adjustVolumeBySwiper = adjustVolumeBySwiper.value,
-            onAdjustVolumeBySwiperChange = {
-                sendBooleanSetting(context, HyperPodsPrefsKey.ADJUST_VOLUME_BY_SWIPER, it)
-            },
             adaptiveAudioLevel = adaptiveAudioLevel.floatValue,
             onAdaptiveAudioLevelChange = {
                 sendPodsSetting(context, HyperPodsPrefsKey.ADAPTIVE_AUDIO_LEVEL, (100 - it * 100).toInt())
@@ -332,8 +326,6 @@ fun AppHorizontalPager(
     onPersonlizedVolumeChange: (Boolean) -> Unit,
     conversationAwareness: Boolean,
     onConversationAwarenessChange: (Boolean) -> Unit,
-    adjustVolumeBySwiper: Boolean,
-    onAdjustVolumeBySwiperChange: (Boolean) -> Unit,
     adaptiveAudioLevel: Float,
     onAdaptiveAudioLevelChange: (Float) -> Unit,
     ancMode: NoiseControlMode?,
@@ -390,8 +382,6 @@ fun AppHorizontalPager(
                                 onPersonlizedVolumeChange = onPersonlizedVolumeChange,
                                 conversationAwareness = conversationAwareness,
                                 onConversationAwarenessChange = onConversationAwarenessChange,
-                                adjustVolumeBySwiper = adjustVolumeBySwiper,
-                                onAdjustVolumeBySwiperChange = onAdjustVolumeBySwiperChange,
                                 adaptiveAudioLevel = adaptiveAudioLevel,
                                 onAdaptiveAudioLevelChange = onAdaptiveAudioLevelChange,
                                 ancMode = ancMode,

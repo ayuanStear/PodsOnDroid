@@ -38,7 +38,6 @@ class SettingsDraftTest {
                         autoSwitchToSpeaker = false, onAutoSwitchToSpeakerChange = {},
                         personlizedVolume = false, onPersonlizedVolumeChange = {},
                         conversationAwareness = false, onConversationAwarenessChange = {},
-                        adjustVolumeBySwiper = false, onAdjustVolumeBySwiperChange = {},
                         adaptiveAudioLevel = 0.5f, onAdaptiveAudioLevelChange = {
                             feedback.value = mapOf(Key.ADAPTIVE_AUDIO_LEVEL to if (immediateFailure) "write_failed" else "sent")
                             if (!immediateFailure) pending.value = setOf(Key.ADAPTIVE_AUDIO_LEVEL)

@@ -55,8 +55,6 @@ class IssueSettingsUiTest {
                         autoSwitchToSpeaker = false, onAutoSwitchToSpeakerChange = {},
                         personlizedVolume = false, onPersonlizedVolumeChange = {},
                         conversationAwareness = false, onConversationAwarenessChange = {},
-                        adjustVolumeBySwiper = settings.value[Key.ADJUST_VOLUME_BY_SWIPER] == 1,
-                        onAdjustVolumeBySwiperChange = { write(Key.ADJUST_VOLUME_BY_SWIPER, if (it) 1 else 2) },
                         adaptiveAudioLevel = 0.5f, onAdaptiveAudioLevelChange = {},
                         onListeningModeChange = { write(Key.LISTENING_MODE_BYTE, it.toInt()) },
                         ancMode = settings.value[PodsSettings.NOISE_MODE]?.let { NoiseControlMode.entries[it - 1] },

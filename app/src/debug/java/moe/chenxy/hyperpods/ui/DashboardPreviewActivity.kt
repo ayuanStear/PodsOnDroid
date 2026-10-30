@@ -77,7 +77,6 @@ class DashboardPreviewActivity : ComponentActivity() {
                 var headGestures by remember { mutableStateOf(false) }
                 var sleepDetection by remember { mutableStateOf(false) }
                 var speaker by remember { mutableStateOf(false) }
-                var swipe by remember { mutableStateOf(false) }
                 var single by remember { mutableStateOf(false) }
                 var level by remember { mutableFloatStateOf(0.5f) }
                 var microphone by remember { mutableIntStateOf(0) }
@@ -110,7 +109,6 @@ class DashboardPreviewActivity : ComponentActivity() {
                             autoSwitchToSpeaker = speaker, onAutoSwitchToSpeakerChange = { speaker = it },
                             personlizedVolume = personalized, onPersonlizedVolumeChange = { personalized = it },
                             conversationAwareness = conversation, onConversationAwarenessChange = { conversation = it },
-                            adjustVolumeBySwiper = swipe, onAdjustVolumeBySwiperChange = { swipe = it },
                             adaptiveAudioLevel = level, onAdaptiveAudioLevelChange = { level = it },
                             onListeningModeChange = {}, ancMode = anc, onAncModeChange = { anc = it },
                             podsInfo = if (unknown) null else AACPManager.Companion.AirPodsInformation(
@@ -126,7 +124,6 @@ class DashboardPreviewActivity : ComponentActivity() {
                                 Key.PERSONLIZED_VOLUME to if (personalized) 1 else 2,
                                 Key.CONVERSATION_AWARENESS to if (conversation) 1 else 2,
                                 Key.SLEEP_DETECTION to if (sleepDetection) 1 else 2,
-                                Key.ADJUST_VOLUME_BY_SWIPER to if (swipe) 1 else 2,
                                 Key.SINGLE_POD_ANC to if (single) 1 else 2,
                                 Key.MICROPHONE_MODE to (PodsSettings.microphoneValue(microphone) ?: 0),
                                 Key.ADAPTIVE_AUDIO_LEVEL to (100 - level * 100).toInt(),

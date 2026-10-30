@@ -91,8 +91,6 @@ fun PodDetailPage(
     onPersonlizedVolumeChange: (Boolean) -> Unit,
     conversationAwareness: Boolean,
     onConversationAwarenessChange: (Boolean) -> Unit,
-    adjustVolumeBySwiper: Boolean,
-    onAdjustVolumeBySwiperChange: (Boolean) -> Unit,
     adaptiveAudioLevel: Float,
     onAdaptiveAudioLevelChange: (Float) -> Unit,
     onListeningModeChange: (Byte) -> Unit,
@@ -419,13 +417,6 @@ fun PodDetailPage(
                             }
                         }
 
-                        if (PodsSettings.supports(Key.ADJUST_VOLUME_BY_SWIPER, model)) SuperSwitch(
-                            title = stringResource(R.string.adjust_volume_by_swiper_title),
-                            summary = feedback(Key.ADJUST_VOLUME_BY_SWIPER, R.string.adjust_volume_by_swiper_summary),
-                            checked = adjustVolumeBySwiper,
-                            enabled = ready(Key.ADJUST_VOLUME_BY_SWIPER),
-                            onCheckedChange = onAdjustVolumeBySwiperChange
-                        )
                         if (PodsSettings.supports(Key.ALLOW_OFF_OPTION, model)) SuperSwitch(
                             title = stringResource(R.string.allow_off_title),
                             summary = stringResource(R.string.allow_off_summary),
